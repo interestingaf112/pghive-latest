@@ -355,6 +355,37 @@ export default function App() {
     }));
   };
 
+  // Helper to open details modal and update URL query params
+  const handleSelectPG = async (pg) => {
+    setSelectedPG(pg);
+    if (pg) {
+      // Add ?pg=pgId to URL query params
+      const params = new URLSearchParams(window.location.search);
+      params.set('pg', pg.id);
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.pushState({}, '', newUrl);
+
+      // Pre-fetch unlocked contacts if already unlocked
+      if (unlockedPGIds.includes(pg.id) && !unlockedContacts[pg.id]) {
+        try {
+          const contacts = await unlockPGContact(pg.id);
+          if (contacts) {
+            setUnlockedContacts(prev => ({ ...prev, [pg.id]: contacts }));
+          }
+        } catch (err) {
+          console.error("Error fetching unlocked contacts:", err);
+        }
+      }
+    } else {
+      // Remove ?pg parameter cleanly from URL
+      const params = new URLSearchParams(window.location.search);
+      params.delete('pg');
+      const searchStr = params.toString();
+      const newUrl = searchStr ? `${window.location.pathname}?${searchStr}` : window.location.pathname;
+      window.history.pushState({}, '', newUrl);
+    }
+  };
+
   // Helper to format locality for URL
   const getLocalitySlug = (loc) => {
     return loc.toLowerCase().replace(/\s+/g, '-');
@@ -373,6 +404,7 @@ export default function App() {
   // Client-side SEO URL router mount & popstate handler
   useEffect(() => {
     const handleLocationChange = () => {
+      // 1. Locality routing
       const path = window.location.pathname;
       const match = path.match(/^\/pg-in-([a-zA-Z0-9-]+)$/i);
       if (match) {
@@ -389,29 +421,133 @@ export default function App() {
       } else if (path === '/' || path === '') {
         setSelectedLocality('all');
       }
+
+      // 2. Deep linking check for ?pg=pgId
+      const params = new URLSearchParams(window.location.search);
+      const pgId = params.get('pg');
+      if (pgId && pgs.length > 0) {
+        const foundPG = pgs.find(p => p.id === pgId);
+        if (foundPG) {
+          setSelectedPG(foundPG);
+          if (unlockedPGIds.includes(pgId) && !unlockedContacts[pgId]) {
+            unlockPGContact(pgId).then(contacts => {
+              if (contacts) {
+                setUnlockedContacts(prev => ({ ...prev, [pgId]: contacts }));
+              }
+            }).catch(err => console.error("Error fetching prefetched contacts:", err));
+          }
+        }
+      } else {
+        setSelectedPG(null);
+      }
     };
 
     handleLocationChange();
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
-  }, [pgs]);
+  }, [pgs, unlockedPGIds, unlockedContacts]);
 
-  // Dynamic SEO page Title and Meta description updates
+  // Dynamic SEO page Title, Meta description, and JSON-LD schema updates for selected PG listing
   useEffect(() => {
-    if (selectedLocality === 'all') {
-      document.title = 'PG wala | Premium Paying Guest Accommodations in Bangalore';
+    if (selectedPG) {
+      // Dynamic Title
+      document.title = `${selectedPG.name} | PG in ${selectedPG.locality} - PG wala`;
       const metaDesc = document.querySelector('meta[name="description"]');
       if (metaDesc) {
-        metaDesc.setAttribute('content', 'Find the best Paying Guest (PG) accommodations in Bangalore with PG wala. Filter by locality, price, amenities, and gender preferences. Zero brokerage — contact owners directly.');
+        const amenitiesStr = selectedPG.amenities ? Object.keys(selectedPG.amenities).filter(k => selectedPG.amenities[k]).join(', ') : '';
+        metaDesc.setAttribute('content', `Explore ${selectedPG.name} co-living in ${selectedPG.locality}, Bangalore. Preferred for: ${selectedPG.preferredGender}. Key amenities: ${amenitiesStr}. Rent starts at ₹${selectedPG.price}/month. Zero brokerage on PG wala.`);
       }
-    } else {
-      document.title = `PG in ${selectedLocality} | Zero Brokerage PG accommodations on PG wala`;
-      const metaDesc = document.querySelector('meta[name="description"]');
-      if (metaDesc) {
-        metaDesc.setAttribute('content', `Find the best Paying Guest (PG) accommodations in ${selectedLocality}, Bangalore. Filter by price, amenities, and gender. Zero brokerage — contact owners directly on PG wala.`);
-      }
+
+      // Dynamic JSON-LD Schema
+      const existingSchema = document.getElementById('dynamic-pg-schema');
+      if (existingSchema) existingSchema.remove();
+
+      const schemaData = {
+        "@context": "https://schema.org",
+        "@type": "Accommodation",
+        "name": selectedPG.name,
+        "description": selectedPG.description,
+        "image": selectedPG.thumbnail || (selectedPG.photos && selectedPG.photos[0]) || "https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=600&q=80",
+        "address": {
+          "@type": "PostalAddress",
+          "addressLocality": selectedPG.locality,
+          "addressRegion": "Karnataka",
+          "addressCountry": "IN"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": selectedPG.price,
+          "priceCurrency": "INR",
+          "category": "Rent"
+        },
+        "amenityFeature": selectedPG.amenities ? Object.keys(selectedPG.amenities).filter(k => selectedPG.amenities[k]).map(key => ({
+          "@type": "LocationFeatureSpecification",
+          "name": key,
+          "value": true
+        })) : []
+      };
+
+      const script = document.createElement('script');
+      script.id = 'dynamic-pg-schema';
+      script.type = 'application/ld+json';
+      script.text = JSON.stringify(schemaData);
+      document.head.appendChild(script);
+
+      return () => {
+        // Revert title & description to locality level
+        if (selectedLocality === 'all') {
+          document.title = 'PG wala | Premium Paying Guest Accommodations in Bangalore';
+          const metaDescDefault = document.querySelector('meta[name="description"]');
+          if (metaDescDefault) {
+            metaDescDefault.setAttribute('content', 'Find the best Paying Guest (PG) accommodations in Bangalore with PG wala. Filter by locality, price, amenities, and gender preferences. Zero brokerage — contact owners directly.');
+          }
+        } else {
+          document.title = `PG in ${selectedLocality} | Zero Brokerage PG accommodations on PG wala`;
+          const metaDescLoc = document.querySelector('meta[name="description"]');
+          if (metaDescLoc) {
+            metaDescLoc.setAttribute('content', `Find the best Paying Guest (PG) accommodations in ${selectedLocality}, Bangalore. Filter by price, amenities, and gender. Zero brokerage — contact owners directly on PG wala.`);
+          }
+        }
+
+        const activeSchema = document.getElementById('dynamic-pg-schema');
+        if (activeSchema) activeSchema.remove();
+      };
     }
-  }, [selectedLocality]);
+  }, [selectedPG, selectedLocality]);
+
+  // Inject/update main directory list schema (ItemList)
+  useEffect(() => {
+    const existingListSchema = document.getElementById('directory-list-schema');
+    if (existingListSchema) existingListSchema.remove();
+
+    if (filteredPGs.length > 0) {
+      const itemListElement = filteredPGs.map((pg, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "url": `https://pgwala.vercel.app/?pg=${pg.id}`,
+        "name": pg.name
+      }));
+
+      const schemaData = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": selectedLocality === 'all' ? "Paying Guest listings in Bangalore" : `Paying Guest listings in ${selectedLocality}, Bangalore`,
+        "numberOfItems": filteredPGs.length,
+        "itemListElement": itemListElement
+      };
+
+      const script = document.createElement('script');
+      script.id = 'directory-list-schema';
+      script.type = 'application/ld+json';
+      script.text = JSON.stringify(schemaData);
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      const activeListSchema = document.getElementById('directory-list-schema');
+      if (activeListSchema) activeListSchema.remove();
+    };
+  }, [filteredPGs, selectedLocality]);
 
   // Unique localities present in PG listings (for dropdown filters)
   const availableLocalities = ['all', ...new Set([...DEFAULT_LOCALITIES, ...pgs.map(pg => pg.locality)])];
@@ -873,19 +1009,7 @@ export default function App() {
                       <PGCard 
                         pg={pg} 
                         isUnlocked={unlockedPGIds.includes(pg.id)}
-                        onViewDetails={async (selected) => {
-                          setSelectedPG(selected);
-                          if (unlockedPGIds.includes(selected.id) && !unlockedContacts[selected.id]) {
-                            try {
-                              const contacts = await unlockPGContact(selected.id);
-                              if (contacts) {
-                                setUnlockedContacts(prev => ({ ...prev, [selected.id]: contacts }));
-                              }
-                            } catch (err) {
-                              console.error("Error fetching unlocked contacts:", err);
-                            }
-                          }
-                        }}
+                        onViewDetails={handleSelectPG}
                       />
                     </div>
                   ))}
@@ -1050,7 +1174,7 @@ export default function App() {
       {selectedPG && (
         <PGDetailsModal 
           pg={selectedPG} 
-          onClose={() => setSelectedPG(null)}
+          onClose={() => handleSelectPG(null)}
           unlockedPGIds={unlockedPGIds}
           unlockedContacts={unlockedContacts}
           onUnlockPG={handleUnlockPG}
