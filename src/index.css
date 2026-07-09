@@ -1859,8 +1859,9 @@ footer {
 
 .campaign-hero {
   position: relative;
-  background: var(--gradient-mesh);
-  background-color: var(--colors-canvas-parchment);
+  background-image: linear-gradient(to right, rgba(248, 250, 252, 0.94) 40%, rgba(248, 250, 252, 0.4) 100%), url('/hero_bg.jpg');
+  background-size: cover;
+  background-position: center;
   padding: 140px 0 80px;
   border-bottom: 1px solid var(--colors-hairline);
   text-align: left;
@@ -1886,8 +1887,9 @@ footer {
 }
 
 [data-theme="dark"] .campaign-hero {
-  background: var(--gradient-mesh);
-  background-color: #030712; /* Rich dark background */
+  background-image: linear-gradient(to right, rgba(15, 23, 42, 0.95) 40%, rgba(15, 23, 42, 0.6) 100%), url('/hero_bg.jpg');
+  background-size: cover;
+  background-position: center;
 }
 
 .campaign-hero .hero-main-title {
