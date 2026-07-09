@@ -515,40 +515,6 @@ export default function App() {
     }
   }, [selectedPG, selectedLocality]);
 
-  // Inject/update main directory list schema (ItemList)
-  useEffect(() => {
-    const existingListSchema = document.getElementById('directory-list-schema');
-    if (existingListSchema) existingListSchema.remove();
-
-    if (filteredPGs.length > 0) {
-      const itemListElement = filteredPGs.map((pg, index) => ({
-        "@type": "ListItem",
-        "position": index + 1,
-        "url": `https://pgwala.vercel.app/?pg=${pg.id}`,
-        "name": pg.name
-      }));
-
-      const schemaData = {
-        "@context": "https://schema.org",
-        "@type": "ItemList",
-        "name": selectedLocality === 'all' ? "Paying Guest listings in Bangalore" : `Paying Guest listings in ${selectedLocality}, Bangalore`,
-        "numberOfItems": filteredPGs.length,
-        "itemListElement": itemListElement
-      };
-
-      const script = document.createElement('script');
-      script.id = 'directory-list-schema';
-      script.type = 'application/ld+json';
-      script.text = JSON.stringify(schemaData);
-      document.head.appendChild(script);
-    }
-
-    return () => {
-      const activeListSchema = document.getElementById('directory-list-schema');
-      if (activeListSchema) activeListSchema.remove();
-    };
-  }, [filteredPGs, selectedLocality]);
-
   // Unique localities present in PG listings (for dropdown filters)
   const availableLocalities = ['all', ...new Set([...DEFAULT_LOCALITIES, ...pgs.map(pg => pg.locality)])];
 
@@ -587,6 +553,40 @@ export default function App() {
 
     return true;
   });
+
+  // Inject/update main directory list schema (ItemList) - Declared after filteredPGs is initialized
+  useEffect(() => {
+    const existingListSchema = document.getElementById('directory-list-schema');
+    if (existingListSchema) existingListSchema.remove();
+
+    if (filteredPGs.length > 0) {
+      const itemListElement = filteredPGs.map((pg, index) => ({
+        "@type": "ListItem",
+        "position": index + 1,
+        "url": `https://pgwala.vercel.app/?pg=${pg.id}`,
+        "name": pg.name
+      }));
+
+      const schemaData = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": selectedLocality === 'all' ? "Paying Guest listings in Bangalore" : `Paying Guest listings in ${selectedLocality}, Bangalore`,
+        "numberOfItems": filteredPGs.length,
+        "itemListElement": itemListElement
+      };
+
+      const script = document.createElement('script');
+      script.id = 'directory-list-schema';
+      script.type = 'application/ld+json';
+      script.text = JSON.stringify(schemaData);
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      const activeListSchema = document.getElementById('directory-list-schema');
+      if (activeListSchema) activeListSchema.remove();
+    };
+  }, [filteredPGs, selectedLocality]);
 
   return (
     <>
