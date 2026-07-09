@@ -1,10 +1,45 @@
+/* eslint-disable no-control-regex */
 /**
  * Input validation and sanitization utilities for PG wala.
  * Used by AdminDashboard form and firebase.js before writing to any store.
  */
 
 /**
- * Strip HTML tags, trim whitespace, and enforce max length. Rejects invalid inputs.
+ * Escape standard SQL characters to block SQL injection attacks.
+ * @param {string} val - Input to escape
+ * @returns {string} Escaped string
+ */
+export function escapeSql(val) {
+  if (val === undefined || val === null) {
+    return '';
+  }
+  const str = typeof val === 'string' ? val : String(val);
+  return str
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "''")
+    .replace(/"/g, '\\"')
+    .replace(/\x00/g, '\\0')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\x1a/g, '\\Z');
+}
+
+/**
+ * Escape NoSQL (MongoDB/Firestore) operators and period nested key delimiters.
+ * @param {string} val - Input to escape
+ * @returns {string} Escaped string
+ */
+export function escapeNoSql(val) {
+  if (val === undefined || val === null) {
+    return '';
+  }
+  const str = typeof val === 'string' ? val : String(val);
+  // Remove leading '$' which initiates operators, and replace '.' to prevent nested field path hijacking
+  return str.replace(/^\$/, '').replace(/\./g, '_');
+}
+
+/**
+ * Strip HTML tags, trim whitespace, enforce max length, and block SQL/XSS patterns.
  * @param {string} input - Raw user input
  * @param {number} maxLength - Maximum allowed characters (default 500)
  * @returns {string} Sanitized string
@@ -27,6 +62,19 @@ export function sanitizeText(input, maxLength = 500) {
   
   if (collapsed.length === 0 && input.length > 0) {
     throw new Error('Input cannot be empty or contain only whitespace.');
+  }
+
+  // Block common SQL injection comments and keywords to protect backend queries
+  const lowerInput = collapsed.toLowerCase();
+  if (
+    lowerInput.includes('union select') ||
+    lowerInput.includes('--') ||
+    lowerInput.includes('/*') ||
+    lowerInput.includes('*/') ||
+    lowerInput.includes('; drop table') ||
+    lowerInput.includes('; delete from')
+  ) {
+    throw new Error('Dangerous input sequence detected (SQL/script injection block).');
   }
 
   return collapsed;

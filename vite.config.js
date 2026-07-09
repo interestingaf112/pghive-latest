@@ -1,8 +1,15 @@
+/* global process */
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(process.cwd(), './src')
+    }
+  },
   build: {
     // Generate source maps for production debugging
     sourcemap: false,

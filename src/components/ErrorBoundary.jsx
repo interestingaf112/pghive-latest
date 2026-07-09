@@ -29,42 +29,80 @@ export default class ErrorBoundary extends React.Component {
           minHeight: '100vh',
           padding: '40px 24px',
           textAlign: 'center',
-          fontFamily: "'Open Sans', sans-serif",
-          backgroundColor: '#ffffff'
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          backgroundColor: 'var(--colors-canvas-parchment)',
+          color: 'var(--colors-ink)'
         }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
-          <h1 style={{ fontSize: '22px', fontWeight: 600, color: '#222222', marginBottom: '8px' }}>
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: '#fee2e2',
+            color: '#ff3b30',
+            fontSize: '28px', 
+            marginBottom: '24px' 
+          }}>
+            ⚠️
+          </div>
+          <h1 style={{ 
+            fontFamily: "'Inter', sans-serif",
+            fontSize: '24px', 
+            fontWeight: 700, 
+            letterSpacing: '-0.5px',
+            color: 'var(--colors-ink)', 
+            marginBottom: '12px' 
+          }}>
             Something went wrong
           </h1>
-          <p style={{ fontSize: '15px', color: '#6a6a6a', maxWidth: '400px', lineHeight: 1.5, marginBottom: '24px' }}>
-            We hit an unexpected error. Please try reloading the page. If the problem persists, clear your browser cache or contact support.
+          <p style={{ 
+            fontSize: '15px', 
+            color: 'var(--colors-muted)', 
+            maxWidth: '380px', 
+            lineHeight: 1.47, 
+            marginBottom: '32px' 
+          }}>
+            We hit an unexpected error. Our system has logged the incident and our team is looking into it. Please try reloading the page.
           </p>
           <button
             onClick={this.handleReload}
             style={{
-              backgroundColor: '#1a73e8',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '12px 28px',
-              fontSize: '16px',
-              fontWeight: 600,
+              backgroundColor: 'transparent',
+              color: 'var(--colors-ink)',
+              border: '1px solid var(--colors-hairline)',
+              borderRadius: 'var(--rounded-sm)',
+              padding: '11px 32px',
+              fontSize: '14px',
+              fontWeight: 400,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
               cursor: 'pointer',
-              transition: 'background-color 0.2s ease'
+              boxShadow: 'none',
+              transition: 'transform 0.15s ease, border-color 0.2s ease'
             }}
-            onMouseOver={(e) => e.target.style.backgroundColor = '#1565d8'}
-            onMouseOut={(e) => e.target.style.backgroundColor = '#1a73e8'}
+            onMouseOver={(e) => {
+              e.target.style.borderColor = 'var(--colors-ink)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.borderColor = 'var(--colors-hairline)';
+            }}
+            onMouseDown={(e) => {
+              e.target.style.transform = 'scale(0.97)';
+            }}
+            onMouseUp={(e) => {
+              e.target.style.transform = 'none';
+            }}
           >
             Reload Page
           </button>
-          {this.state.error && (
-            <details style={{ marginTop: '32px', fontSize: '12px', color: '#999', maxWidth: '600px', textAlign: 'left' }}>
-              <summary style={{ cursor: 'pointer', marginBottom: '8px' }}>Technical details</summary>
-              <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all', background: '#f7f7f7', padding: '12px', borderRadius: '8px' }}>
-                {this.state.error.toString()}
-              </pre>
-            </details>
-          )}
+          
+          <details style={{ marginTop: '32px', textAlign: 'left', maxWidth: '500px', width: '100%', backgroundColor: 'var(--colors-surface-soft)', padding: '16px', borderRadius: '4px', border: '1px solid var(--colors-hairline)', fontSize: '12px', color: 'var(--colors-muted)', overflowX: 'auto', fontFamily: 'monospace' }}>
+            <summary style={{ cursor: 'pointer', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Error Details (Developer info)</summary>
+            <div style={{ fontWeight: 700, color: 'var(--colors-ink)', marginBottom: '4px' }}>{this.state.error?.toString()}</div>
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.4 }}>{this.state.error?.stack}</pre>
+          </details>
         </div>
       );
     }

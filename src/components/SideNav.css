@@ -1,0 +1,221 @@
+/* =============================================
+   Sticky Side Rail Navigation
+   ============================================= */
+
+.side-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 12px;
+  box-sizing: border-box;
+  z-index: 1000;
+  background: var(--colors-surface-card);
+  border-right: 1px solid var(--colors-hairline);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.04);
+  will-change: transform, opacity;
+}
+
+/* ---- Logo ---- */
+.side-nav-logo {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-radius: var(--rounded-sm);
+  transition: background 0.2s ease;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  outline: none;
+}
+
+.side-nav-logo:hover {
+  background: var(--colors-surface-soft);
+}
+
+.side-nav-logo-text {
+  font-family: var(--font-family-display);
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: -0.5px;
+  color: var(--colors-ink);
+  text-transform: lowercase;
+}
+
+/* ---- Divider ---- */
+.side-nav-divider {
+  height: 1px;
+  background: var(--colors-hairline);
+  margin: 16px 0;
+  border: none;
+}
+
+/* ---- Nav List ---- */
+.side-nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+/* ---- Nav Item (shared for button + a) ---- */
+.side-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--rounded-sm);
+  font-family: var(--font-family-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  color: var(--colors-muted);
+  text-decoration: none;
+  text-transform: lowercase;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.2s ease, background 0.2s ease;
+  overflow: hidden;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.side-nav-item:hover,
+.side-nav-item:focus-visible {
+  color: var(--colors-ink);
+  background: var(--colors-surface-soft);
+}
+
+/* ---- Hover accent bar (left edge) ---- */
+.side-nav-hover-bar {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 60%;
+  background: var(--colors-primary);
+  border-radius: 0 3px 3px 0;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.side-nav-item:hover .side-nav-hover-bar,
+.side-nav-item:focus-visible .side-nav-hover-bar {
+  transform: translateY(-50%) scaleY(1);
+}
+
+/* ---- Icon ---- */
+.side-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.side-nav-item:hover .side-nav-icon,
+.side-nav-item:focus-visible .side-nav-icon {
+  opacity: 1;
+}
+
+/* ---- Label ---- */
+.side-nav-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================= 
+   Mobile: collapse to bottom bar on small screens
+   ============================================= */
+
+@media (max-width: 768px) {
+  .side-nav {
+    width: 100%;
+    height: auto;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    flex-direction: row;
+    padding: 8px 12px;
+    border-right: none;
+    border-top: 1px solid var(--colors-hairline);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+    align-items: center;
+    gap: 0;
+  }
+
+  .side-nav-logo {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 8px 12px 8px 4px;
+    border-right: 1px solid var(--colors-hairline);
+    margin-right: 4px;
+    border-radius: 0;
+  }
+
+  .side-nav-logo:hover {
+    background: transparent;
+  }
+
+  .side-nav-logo-text {
+    font-size: 15px;
+  }
+
+  .side-nav-divider {
+    display: none;
+  }
+
+  .side-nav-list {
+    flex-direction: row;
+    flex: 1;
+    gap: 0;
+    justify-content: space-around;
+    align-items: stretch;
+  }
+
+  .side-nav-list li {
+    flex: 1;
+    display: flex;
+  }
+
+  .side-nav-item {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 8px 4px;
+    font-size: 10px;
+    letter-spacing: 0;
+    border-radius: var(--rounded-sm);
+  }
+
+  .side-nav-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 16px;
+    opacity: 0.8;
+  }
+
+  .side-nav-hover-bar {
+    display: none;
+  }
+}

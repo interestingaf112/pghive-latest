@@ -28,7 +28,7 @@ export function useScrollReveal(containerRef = null) {
     );
 
     const root = containerRef?.current || document;
-    const elements = root.querySelectorAll('.scroll-reveal');
+    const elements = root.querySelectorAll('.scroll-reveal:not(.visible)');
     elements.forEach((el) => observerRef.current?.observe(el));
 
     return () => {

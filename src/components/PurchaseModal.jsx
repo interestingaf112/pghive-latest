@@ -1,9 +1,69 @@
-import React, { useState } from 'react';
-import { X, CreditCard, ShieldCheck, Loader2, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, CreditCard, ShieldCheck, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import gsap from 'gsap';
+import { isFirebaseActive, getFirebaseIdToken } from '../firebase';
 
-export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
+export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [successPack, setSuccessPack] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const modalRef = useRef(null);
+  const successRef = useRef(null);
+
+  useEffect(() => {
+    if (successPack && successRef.current) {
+      gsap.fromTo(successRef.current, 
+        { scale: 0.5, opacity: 0 }, 
+        { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.5)' }
+      );
+    }
+  }, [successPack]);
+
+  // Focus trap & Escape close for accessibility
+  useEffect(() => {
+    if (modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll('button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (!modalRef.current) return;
+        const focusableElements = Array.from(
+          modalRef.current.querySelectorAll(
+            'button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+        
+        if (focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !modalRef.current.contains(document.activeElement)) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement || !modalRef.current.contains(document.activeElement)) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, successPack]);
 
   const packages = [
     { id: 'pack-1', title: 'Single Unlock', credits: 1, price: 49, desc: 'Unlock contact details of 1 PG listing.' },
@@ -26,32 +86,141 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
     });
   };
 
+  /**
+   * SECURITY FIX #3: Server-verified payment flow.
+   * 
+   * Firebase Mode:
+   *   1. POST /api/create-order → get Razorpay order_id (server creates order)
+   *   2. Open Razorpay checkout with order_id
+   *   3. On success, POST /api/verify-payment → server verifies HMAC signature
+   *      and grants credits via Admin SDK
+   *   4. Show success UI
+   * 
+   * Local Mode (dev/demo only):
+   *   Falls back to client-side addCredits via onPurchaseSuccess callback.
+   */
   const handleBuy = async (pack) => {
     setIsProcessing(true);
     setSuccessPack(null);
+    setErrorMessage(null);
 
     const isSdkLoaded = await loadRazorpayScript();
     if (!isSdkLoaded) {
+      // SECURITY FIX #3: Removed mock payment simulator.
+      // If Razorpay fails to load, show an error instead of granting free credits.
       setIsProcessing(false);
-      alert('Failed to load the payment gateway SDK. Please check your internet connection and try again.');
+      setErrorMessage(
+        'Could not load payment gateway. Please disable ad-blockers and check your internet connection, then try again.'
+      );
       return;
     }
 
+    // ── Firebase Mode: Server-verified payment ─────────────────────────
+    if (isFirebaseActive) {
+      try {
+        // Step 1: Get Firebase ID token for server authentication
+        const idToken = await getFirebaseIdToken();
+        if (!idToken) {
+          setIsProcessing(false);
+          setErrorMessage('Please sign in to purchase credits.');
+          return;
+        }
+
+        // Step 2: Create a Razorpay order on the server
+        const orderRes = await fetch('/api/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packId: pack.id, idToken }),
+        });
+
+        if (!orderRes.ok) {
+          const errData = await orderRes.json().catch(() => ({}));
+          throw new Error(errData.error || 'Failed to create payment order.');
+        }
+
+        const orderData = await orderRes.json();
+
+        // Step 3: Open Razorpay checkout with server-generated order_id
+        const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T3r6EQF4wFA4xx';
+
+        const options = {
+          key: razorpayKey,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          order_id: orderData.orderId,
+          name: 'PG wala',
+          description: `${pack.title} — ${pack.credits} Credits`,
+          theme: { color: '#000000' },
+          prefill: {
+            name: currentUser?.displayName || 'PG Tenant User',
+            email: currentUser?.email || '',
+            contact: currentUser?.phoneNumber || ''
+          },
+          handler: async function (response) {
+            // Step 4: Verify payment on server
+            try {
+              const verifyRes = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                  packId: pack.id,
+                  idToken: await getFirebaseIdToken(),
+                }),
+              });
+
+              if (!verifyRes.ok) {
+                const errData = await verifyRes.json().catch(() => ({}));
+                throw new Error(errData.error || 'Payment verification failed.');
+              }
+
+              setIsProcessing(false);
+              setSuccessPack(pack);
+              // Notify parent to refresh credits (server already added them)
+              onPurchaseSuccess(0);
+            } catch (verifyErr) {
+              console.error('Payment verification failed:', verifyErr);
+              setIsProcessing(false);
+              setErrorMessage(
+                'Payment was received but verification failed. Your credits will be added shortly. ' +
+                'If not, contact support with your payment ID: ' + response.razorpay_payment_id
+              );
+            }
+          },
+          modal: {
+            ondismiss: function () {
+              setIsProcessing(false);
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+
+      } catch (err) {
+        console.error('Payment flow error:', err);
+        setIsProcessing(false);
+        setErrorMessage(err.message || 'Could not process payment. Please try again.');
+      }
+      return;
+    }
+
+    // ── Local Mode: Client-side flow (dev/demo only) ───────────────────
     const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_T3r6EQF4wFA4xx';
 
     const options = {
       key: razorpayKey,
-      amount: pack.price * 100, // Amount in paise (₹49 -> 4900 paise)
+      amount: pack.price * 100,
       currency: 'INR',
       name: 'PG wala',
       description: `${pack.title} — ${pack.credits} Credits`,
-      theme: {
-        color: '#2563eb' // Electric Cobalt theme
-      },
+      theme: { color: '#000000' },
       prefill: {
-        name: 'PG Guest User',
-        email: 'guest.pgwala@example.com',
-        contact: '9999999999'
+        name: currentUser?.displayName || 'PG Tenant User',
+        email: currentUser?.email || 'tenant.pgwala@example.com',
+        contact: currentUser?.phoneNumber || '9999999999'
       },
       handler: function (response) {
         console.log("Razorpay transaction successful:", response.razorpay_payment_id);
@@ -61,7 +230,6 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
       },
       modal: {
         ondismiss: function () {
-          console.log("Razorpay checkout closed by user.");
           setIsProcessing(false);
         }
       }
@@ -73,7 +241,7 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
     } catch (err) {
       console.error("Failed to initialize Razorpay checkout window:", err);
       setIsProcessing(false);
-      alert("Could not open payment portal. Please check if your Key ID is correct.");
+      setErrorMessage("Could not open payment portal. Please check if your Key ID is correct.");
     }
   };
 
@@ -87,13 +255,41 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', borderRadius: 'var(--rounded-md)' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} ref={modalRef} style={{ maxWidth: '520px', borderRadius: 'var(--rounded-md)' }}>
         <button className="modal-close-btn" onClick={onClose} aria-label="Close purchase modal">
           <X size={18} />
         </button>
 
         <div className="modal-body" style={{ padding: '32px' }}>
           
+          {/* Error Message Banner */}
+          {errorMessage && !isProcessing && !successPack && (
+            <div style={{ 
+              display: 'flex', alignItems: 'flex-start', gap: '10px', 
+              padding: '12px 16px', marginBottom: '20px', 
+              borderRadius: 'var(--rounded-sm)',
+              backgroundColor: 'rgba(220, 38, 38, 0.08)',
+              border: '1px solid rgba(220, 38, 38, 0.2)',
+              color: 'var(--colors-ink)'
+            }}>
+              <AlertCircle size={18} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <p className="body-sm" style={{ margin: 0, lineHeight: 1.5 }}>{errorMessage}</p>
+                <button 
+                  className="body-sm" 
+                  onClick={() => setErrorMessage(null)}
+                  style={{ 
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: '#dc2626', fontWeight: 600, padding: 0, marginTop: '6px',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* View 1: Processing Loader */}
           {isProcessing && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', textAlign: 'center', width: '100%', minHeight: '300px' }}>
@@ -105,7 +301,7 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
               <button 
                 className="btn btn-secondary btn-sm" 
                 onClick={() => setIsProcessing(false)}
-                style={{ width: 'auto', padding: '8px 20px', minHeight: '34px', borderRadius: '4px', fontWeight: 600 }}
+                style={{ width: 'auto', padding: '8px 20px', minHeight: '34px', borderRadius: 'var(--rounded-pill)', fontWeight: 600 }}
               >
                 Cancel & Go Back
               </button>
@@ -114,7 +310,7 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
 
           {/* View 2: Purchase Success screen */}
           {!isProcessing && successPack && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', textAlign: 'center', width: '100%', minHeight: '300px' }}>
+            <div ref={successRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', textAlign: 'center', width: '100%', minHeight: '300px' }}>
               <CheckCircle2 size={56} style={{ color: 'var(--colors-success)', marginBottom: '20px' }} />
               <h3 className="title-md" style={{ fontSize: '22px', marginBottom: '8px' }}>Payment Successful!</h3>
               <p className="body-md" style={{ fontWeight: 600, color: 'var(--colors-ink)', marginBottom: '4px' }}>
@@ -123,7 +319,7 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess }) {
               <p className="body-sm" style={{ color: 'var(--colors-muted)', marginBottom: '24px' }}>
                 Receipt sent to registered email. You can now unlock PG listings.
               </p>
-              <button className="btn btn-primary" onClick={onClose} style={{ maxWidth: '180px', borderRadius: 'var(--rounded-full)', minHeight: '38px', padding: '8px 24px' }}>
+              <button className="btn btn-primary" onClick={onClose} style={{ maxWidth: '180px', borderRadius: 'var(--rounded-pill)', minHeight: '38px', padding: '8px 24px' }}>
                 Continue
               </button>
             </div>

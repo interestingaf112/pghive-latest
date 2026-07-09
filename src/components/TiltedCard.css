@@ -1,0 +1,79 @@
+.tilted-card-figure {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  perspective: 1000px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.tilted-card-mobile-alert {
+  position: absolute;
+  top: 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .tilted-card-mobile-alert {
+    display: none; /* Hide warning to keep UI clean */
+  }
+  .tilted-card-caption {
+    display: none;
+  }
+}
+
+.tilted-card-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: visible; /* Allow 3D overlays to pop out */
+}
+
+.tilted-card-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  object-fit: cover;
+  border-radius: 12px;
+  will-change: transform;
+  transform: translateZ(0);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.tilted-card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  will-change: transform;
+  transform: translateZ(25px);
+  pointer-events: none; /* Let clicks pass through to standard handlers */
+}
+
+.tilted-card-caption {
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 6px;
+  background-color: var(--colors-canvas, #fff);
+  border: 1px solid var(--colors-hairline);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--colors-ink, #2d2d2d);
+  opacity: 0;
+  z-index: 3;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}

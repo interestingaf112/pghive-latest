@@ -1,0 +1,193 @@
+/* =============================================
+   Dot Matrix Nav
+   ============================================= */
+
+/* ---- Logo (top-left) ---- */
+.dot-nav-logo-wrap {
+  position: fixed;
+  top: 24px;
+  left: 28px;
+  z-index: 1001;
+}
+
+.dot-nav-logo {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--font-family-display);
+  font-weight: 900;
+  font-size: 17px;
+  letter-spacing: -0.5px;
+  color: var(--colors-ink);
+  text-transform: lowercase;
+  line-height: 1;
+  opacity: 0.92;
+  transition: opacity 0.2s ease;
+  outline: none;
+}
+
+.dot-nav-logo:hover {
+  opacity: 1;
+}
+
+/* ---- Trigger wrap (top-right) ---- */
+.dot-nav-trigger-wrap {
+  position: fixed;
+  top: 24px;
+  right: 28px;
+  z-index: 1001;
+  /* All arc items are positioned relative to this */
+}
+
+/* ---- 3-dot trigger button ---- */
+.dot-nav-trigger {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1.5px solid var(--colors-hairline);
+  background: var(--colors-surface-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: 
+    background 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s ease;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  position: relative;
+  z-index: 2;
+  outline: none;
+}
+
+.dot-nav-trigger:hover {
+  background: var(--colors-primary);
+  border-color: var(--colors-primary);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  transform: scale(1.05);
+}
+
+.dot-nav-trigger:hover .dot-nav-dot {
+  background: var(--colors-on-primary);
+}
+
+.dot-nav-trigger.open {
+  background: var(--colors-primary);
+  border-color: var(--colors-primary);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  transform: rotate(90deg) scale(1.05);
+}
+
+.dot-nav-trigger.open .dot-nav-dot {
+  background: var(--colors-on-primary);
+}
+
+/* ---- Dots ---- */
+.dot-nav-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--colors-ink);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+/* ---- Fan Arc Items ---- */
+.dot-nav-arc-item {
+  position: absolute;
+  /* Centered on the trigger center (trigger is 44px, so offset by 22px) */
+  top: 22px;
+  right: 22px;
+  transform: translate(50%, -50%) translate(0px, 0px) scale(0);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+
+  /* Pill shape */
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px 8px 10px;
+  background: var(--colors-surface-card);
+  border: 1.5px solid var(--colors-hairline);
+  border-radius: 9999px;
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+
+  font-family: var(--font-family-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--colors-muted);
+  letter-spacing: -0.1px;
+  text-transform: lowercase;
+
+  transition:
+    transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.3s ease,
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+  transition-delay: 0ms;
+}
+
+.dot-nav-arc-item.open {
+  transform: translate(50%, -50%) translate(var(--x), var(--y)) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+  transition-delay: var(--delay, 0ms);
+}
+
+.dot-nav-arc-item:hover {
+  background: var(--colors-primary);
+  color: var(--colors-on-primary);
+  border-color: var(--colors-primary);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  transform: translate(50%, -50%) translate(var(--x), var(--y)) scale(1.06);
+}
+
+.dot-nav-arc-icon {
+  font-size: 13px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.dot-nav-arc-label {
+  line-height: 1;
+}
+
+/* ---- Dark mode shadow strengthening ---- */
+[data-theme="dark"] .dot-nav-trigger {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .dot-nav-arc-item {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .dot-nav-arc-item:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Mobile: slightly smaller + moved inward ---- */
+@media (max-width: 480px) {
+  .dot-nav-logo-wrap {
+    top: 18px;
+    left: 20px;
+  }
+
+  .dot-nav-trigger-wrap {
+    top: 18px;
+    right: 20px;
+  }
+
+  .dot-nav-logo {
+    font-size: 15px;
+  }
+}

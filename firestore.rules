@@ -1,21 +1,112 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // PG listings - publicly readable, admin-only write
+    
+    function isAdmin() {
+      return request.auth != null && 
+        (request.auth.token.email == 'admin@pgwala.com' ||
+         request.auth.token.email == 'abhinandshopify@gmail.com' ||
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true));
+    }
+    
+    // Helper check if the user has unlocked this specific PG listing
+    function isUnlocked(pgId) {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        pgId in get(/databases/$(database)/documents/users/$(request.auth.uid)).data.unlockedPGs;
+    }
+
+    // Validate PG listing structure, types, and constraints on the database level
+    function isValidPGSchema(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() <= 200
+        && data.locality is string && data.locality.size() > 0 && data.locality.size() <= 100
+        && data.address is string && data.address.size() > 0 && data.address.size() <= 500
+        && data.description is string && data.description.size() > 0 && data.description.size() <= 2000
+        && data.price is number && data.price > 0 && data.price <= 500000
+        && data.gender is string && (data.gender == 'boys' || data.gender == 'girls' || data.gender == 'unisex');
+    }
+
+    // Validate User document structure
+    function isValidUserSchema(data) {
+      return data.credits is number && data.credits >= 0
+        && data.unlockedPGs is list;
+    }
+
+    // PG listings - public read, owner/admin write
     match /pgs/{pgId} {
       allow read: if true;
-      allow create, update, delete: if request.auth != null;
+      allow create: if request.auth != null 
+                    && (request.resource.data.ownerId == request.auth.uid || isAdmin())
+                    && (isAdmin() || isValidPGSchema(request.resource.data));
+      allow update: if request.auth != null 
+                    && (resource.data.ownerId == request.auth.uid || isAdmin())
+                    && (isAdmin() || (
+                      isValidPGSchema(request.resource.data)
+                      // SECURITY FIX #8: Pin ownership and activation fields as immutable for non-admin updates
+                      && request.resource.data.ownerId == resource.data.ownerId
+                      && request.resource.data.isActive == resource.data.isActive
+                      && request.resource.data.activationTime == resource.data.activationTime
+                    ));
+      allow delete: if request.auth != null && (resource.data.ownerId == request.auth.uid || isAdmin());
       
       // Private contact details subcollection
       match /private/{docId} {
-        allow read: if request.auth != null;
-        allow write: if request.auth != null;
+        allow read: if request.auth != null && 
+          (get(/databases/$(database)/documents/pgs/$(pgId)).data.ownerId == request.auth.uid || 
+           isUnlocked(pgId) || 
+           isAdmin());
+        allow write: if request.auth != null && 
+          (get(/databases/$(database)/documents/pgs/$(pgId)).data.ownerId == request.auth.uid || 
+           isAdmin());
       }
     }
     
-    // User credit balances - only the owning user
+    // User credit balances and unlocked list - only the owning user or admin
+    // SECURED: Direct user writes are restricted to matching credit deductions upon unlocks.
+    // Users cannot increase their credit balance; only Admin SDK updates can increment credits.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin())
+                   && (
+                     isAdmin()
+                     ||
+                     (isValidUserSchema(request.resource.data)
+                      // SECURITY FIX #1: Block non-admin users from granting themselves admin privileges.
+                      // The isAdmin field can only be set by the Admin SDK (server-side).
+                      && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false)
+                      && (
+                       // Creation rule: initialize with default credits (3), strict field allowlist
+                       (resource == null 
+                        && request.resource.data.credits == 3 
+                        && request.resource.data.unlockedPGs.size() == 0
+                        && request.resource.data.keys().hasOnly(['credits', 'unlockedPGs'])
+                       )
+                       ||
+                       // Update rule: enforce credit deduction matches growth of unlocked PG list.
+                       // Credit increments are ONLY possible via Admin SDK (server-side Cloud Functions).
+                       (resource != null 
+                        && request.resource.data.unlockedPGs.size() >= resource.data.unlockedPGs.size()
+                        && request.resource.data.credits == resource.data.credits - (request.resource.data.unlockedPGs.size() - resource.data.unlockedPGs.size())
+                       )
+                     ))
+                   );
+    }
+    
+    // Collection group query permission for private contact subcollection
+    match /{path=**}/private/{docId} {
+      allow get: if request.auth != null && (
+        isAdmin() ||
+        get(/databases/$(database)/documents/pgs/$(path[1])).data.ownerId == request.auth.uid ||
+        isUnlocked(path[1])
+      );
+      // SECURITY FIX #2: Restrict collection-group list to admin-only.
+      // Regular users must use per-document get, which checks isUnlocked(pgId).
+      // The previous blanket 'allow list' let any anonymous user dump all private contacts.
+      allow list: if request.auth != null && isAdmin();
+      allow write: if request.auth != null && (
+        isAdmin() ||
+        get(/databases/$(database)/documents/pgs/$(path[1])).data.ownerId == request.auth.uid
+      );
     }
     
     // Block everything else

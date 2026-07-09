@@ -1,7 +1,55 @@
-import React from 'react';
+import { useEffect, useRef } from 'react';
 import { X, Shield, FileText } from 'lucide-react';
 
 export default function TermsModal({ onClose }) {
+  const modalRef = useRef(null);
+
+  // Focus trap & Escape close for accessibility
+  useEffect(() => {
+    if (modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll('button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (!modalRef.current) return;
+        const focusableElements = Array.from(
+          modalRef.current.querySelectorAll(
+            'button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+        
+        if (focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !modalRef.current.contains(document.activeElement)) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement || !modalRef.current.contains(document.activeElement)) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const sections = [
     {
       title: "1. Service Overview",
@@ -23,7 +71,7 @@ export default function TermsModal({ onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} ref={modalRef} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)' }}>
         <button className="modal-close-btn" onClick={onClose} aria-label="Close Terms">
           <X size={18} />
         </button>

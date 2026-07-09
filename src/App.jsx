@@ -1,43 +1,71 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   fetchAllPGs, 
   createPGListing, 
   deletePGListing, 
+  updatePGListing,
+  getAdminPGContactDetails,
   logoutAdminSession, 
   subscribeToAuth,
   isFirebaseActive,
   getUserCredits,
   getUnlockedPGIds,
   unlockPGContact,
-  addCredits
+  addCredits,
+  logoutTenantUser
 } from './firebase';
 import Header from './components/Header';
+import DecryptedText from './components/DecryptedText';
 import PGCard from './components/PGCard';
 import PGDetailsModal from './components/PGDetailsModal';
 import AdminDashboard from './components/AdminDashboard';
 import PurchaseModal from './components/PurchaseModal';
 import HelpCenterModal from './components/HelpCenterModal';
 import TermsModal from './components/TermsModal';
+import PrivacyModal from './components/PrivacyModal';
 import InfoModal from './components/InfoModal';
 import ListYourPGModal from './components/ListYourPGModal';
+import AuthModal from './components/AuthModal';
+import AccountCentreModal from './components/AccountCentreModal';
+import { Analytics } from '@vercel/analytics/react';
 import { useScrollReveal } from './hooks/useScrollReveal';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal, Home, Coins, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BANGALORE_LOCALITIES } from './utils/constants';
+
+const DEFAULT_LOCALITIES = BANGALORE_LOCALITIES;
 
 export default function App() {
   const [pgs, setPgs] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Full-page Loader States
-  const [showLoader, setShowLoader] = useState(true);
-  const [loaderFade, setLoaderFade] = useState(false);
-  const [statusText, setStatusText] = useState('Locating verified properties...');
-
   // Scroll reveal observer
   const mainRef = useRef(null);
   useScrollReveal(mainRef);
+
+  const hubsGridRef = useRef(null);
+
+  const scrollHubs = (direction) => {
+    if (hubsGridRef.current) {
+      const scrollAmount = direction === 'left' ? -320 : 320;
+      hubsGridRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
   
-  // Navigation State
-  const [isAdminMode, setIsAdminMode] = useState(false);
+  // Navigation State - lazy initialize from URL params
+  const [isAdminMode, setIsAdminMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const isAdmin = params.get('portal') === 'admin' || params.get('admin') === 'true';
+      if (isAdmin) {
+        setTimeout(() => {
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        }, 0);
+      }
+      return isAdmin;
+    }
+    return false;
+  });
   const [adminUser, setAdminUser] = useState(null);
   
   // Modals
@@ -45,8 +73,26 @@ export default function App() {
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [showHelpCenter, setShowHelpCenter] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [infoModalType, setInfoModalType] = useState(null); // 'investors' | 'features' | 'discrimination' | 'disability'
   const [showListModal, setShowListModal] = useState(false);
+
+  // Authentication Modals & Session States - lazy initialize session
+  const [currentUser, setCurrentUser] = useState(() => {
+    if (typeof window !== 'undefined' && !isFirebaseActive) {
+      const storedTenant = localStorage.getItem('tenant_session');
+      if (storedTenant) {
+        try {
+          return JSON.parse(storedTenant);
+        } catch (e) {
+          console.error("Error loading mock tenant session:", e);
+        }
+      }
+    }
+    return null;
+  });
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAccountCentre, setShowAccountCentre] = useState(false);
 
   // Credit system — loaded from service layer (not raw localStorage)
   const [userCredits, setUserCredits] = useState(0);
@@ -54,56 +100,19 @@ export default function App() {
   // Map of pgId → { phone, email, whatsapp } for unlocked contacts
   const [unlockedContacts, setUnlockedContacts] = useState({});
 
-  // Theme State (Light / Dark Mode)
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('pg_wala_theme');
-    if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  // Theme State - Forced to Light Mode permanently as default
+  const theme = 'light';
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('pg_wala_theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('pg_wala_theme', 'light');
+  }, []);
 
-  const toggleTheme = (e) => {
-    if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-      return;
-    }
+  const toggleTheme = () => {};
 
-    const x = e?.clientX ?? window.innerWidth / 2;
-    const y = e?.clientY ?? window.innerHeight / 2;
-    const endRadius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y)
-    );
-
-    const transition = document.startViewTransition(() => {
-      setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-    });
-
-    transition.ready.then(() => {
-      const clipPath = [
-        `circle(0px at ${x}px ${y}px)`,
-        `circle(${endRadius}px at ${x}px ${y}px)`
-      ];
-      document.documentElement.animate(
-        {
-          clipPath: clipPath,
-        },
-        {
-          duration: 450,
-          easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
-          pseudoElement: '::view-transition-new(root)',
-        }
-      );
-    });
-  };
-
-  // Lock body scroll when any modal or loader screen is visible
+  // Lock body scroll when any modal is visible
   useEffect(() => {
-    const isLocked = showLoader || !!selectedPG || showPurchaseModal || showHelpCenter || showTerms || !!infoModalType || showListModal;
+    const isLocked = !!selectedPG || showPurchaseModal || showHelpCenter || showTerms || showPrivacy || !!infoModalType || showListModal;
     if (isLocked) {
       document.body.style.overflow = 'hidden';
       document.body.style.height = '100vh';
@@ -115,7 +124,7 @@ export default function App() {
       document.body.style.overflow = '';
       document.body.style.height = '';
     };
-  }, [showLoader, selectedPG, showPurchaseModal, showHelpCenter, showTerms, infoModalType, showListModal]);
+  }, [selectedPG, showPurchaseModal, showHelpCenter, showTerms, showPrivacy, infoModalType, showListModal]);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,24 +145,36 @@ export default function App() {
     parking: false
   });
 
+  // Toast notifications
+  const [toasts, setToasts] = useState([]);
+  const showToast = (message, type = 'info') => {
+    const id = Date.now() + Math.random().toString(36).substring(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4500);
+  };
+
+  // Mobile Bottom Sheet
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
+  // Onboarding - lazy initialize
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('pg_wala_onboarded');
+    }
+    return false;
+  });
+  const [onboardingStep, setOnboardingStep] = useState(1);
+
+  const closeOnboarding = () => {
+    localStorage.setItem('pg_wala_onboarded', 'true');
+    setShowOnboarding(false);
+  };
+
   // Load PGs, Auth Status, and Credits on Mount
   useEffect(() => {
-    // Dynamic status text loading messages
-    const messages = [
-      'Locating verified properties...',
-      'Connecting to host server...',
-      'Retrieving rental listings...',
-      'Calculating credit unlock routes...',
-      'Securing user portal session...'
-    ];
-    let msgIdx = 0;
-    const interval = setInterval(() => {
-      msgIdx = (msgIdx + 1) % messages.length;
-      setStatusText(messages[msgIdx]);
-    }, 900);
-
     async function loadData() {
-      const startTime = Date.now();
       try {
         const [data, credits, unlocked] = await Promise.all([
           fetchAllPGs(),
@@ -167,42 +188,32 @@ export default function App() {
         console.error("Error loading data:", err);
       } finally {
         setLoading(false);
-        
-        const elapsedTime = Date.now() - startTime;
-        // Minimum total loading screen duration is 1.7s (1700ms).
-        // The fade-out animation takes 500ms, so we start fade-out after (1700 - 500) = 1200ms minus elapsed time.
-        const delayBeforeFade = Math.max(0, 1200 - elapsedTime);
-        
-        setTimeout(() => {
-          setLoaderFade(true);
-          setTimeout(() => {
-            setShowLoader(false);
-          }, 500);
-        }, delayBeforeFade);
       }
     }
     loadData();
 
     // Subscribe to auth state updates
+    const adminEmail = import.meta.env?.VITE_ADMIN_USER;
     const unsubscribe = subscribeToAuth((user) => {
-      setAdminUser(user);
+      if (user) {
+        if (user.email === adminEmail || user.username === adminEmail || user.uid === 'local-admin') {
+          setAdminUser(user);
+          setCurrentUser(null);
+        } else {
+          setCurrentUser(user);
+          setAdminUser(null);
+        }
+      } else {
+        setAdminUser(null);
+        if (isFirebaseActive) {
+          setCurrentUser(null);
+        }
+      }
     });
 
     return () => {
       unsubscribe();
-      clearInterval(interval);
     };
-  }, []);
-
-  // Hidden Admin Panel Query Parameter Activation
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('portal') === 'admin' || params.get('admin') === 'true') {
-      setIsAdminMode(true);
-      // Clean up URL parameters to keep it hidden
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    }
   }, []);
 
   // Database handlers
@@ -211,6 +222,13 @@ export default function App() {
     const data = await fetchAllPGs();
     setPgs(data);
     return newListing;
+  };
+
+  const handleUpdatePG = async (pgId, pgData, imageFilesOrUrls) => {
+    const updatedListing = await updatePGListing(pgId, pgData, imageFilesOrUrls);
+    const data = await fetchAllPGs();
+    setPgs(data);
+    return updatedListing;
   };
 
   const handleDeletePG = async (pgId) => {
@@ -222,7 +240,7 @@ export default function App() {
       const data = await fetchAllPGs();
       setPgs(data);
     } catch (err) {
-      alert("Error deleting listing: " + err.message);
+      showToast("Error deleting listing: " + err.message, "error");
     }
   };
 
@@ -231,9 +249,56 @@ export default function App() {
     setIsAdminMode(false);
   };
 
+  // Sync credits and unlocked listings when the user session changes
+  useEffect(() => {
+    async function syncUserData() {
+      try {
+        const [credits, unlocked] = await Promise.all([
+          getUserCredits(),
+          getUnlockedPGIds()
+        ]);
+        setUserCredits(credits);
+        setUnlockedPGIds(unlocked);
+      } catch (err) {
+        console.error("Error syncing user data on auth change:", err);
+      }
+    }
+    syncUserData();
+  }, [currentUser]);
+
+  const handleAuthSuccess = (user) => {
+    setCurrentUser(user);
+  };
+
+  const handleLogoutUser = async () => {
+    try {
+      await logoutTenantUser();
+    } catch (err) {
+      console.error("User signout error:", err);
+    }
+    setCurrentUser(null);
+    setShowAccountCentre(false);
+    window.location.reload();
+  };
+
+  const handleOpenPurchaseModal = () => {
+    if (!currentUser) {
+      showToast("Please sign in or create an account to buy credits.", "info");
+      setShowAuthModal(true);
+      return;
+    }
+    setShowPurchaseModal(true);
+  };
+
   // NoBroker Unlock Handler — uses service-layer function
   const handleUnlockPG = async (pgId) => {
     if (unlockedPGIds.includes(pgId)) return;
+
+    if (!currentUser) {
+      showToast("Please sign in or create an account to unlock contacts.", "info");
+      setShowAuthModal(true);
+      return;
+    }
 
     if (userCredits > 0) {
       const confirmUnlock = window.confirm(
@@ -248,10 +313,10 @@ export default function App() {
             setUnlockedPGIds(prev => [...prev, pgId]);
             setUnlockedContacts(prev => ({ ...prev, [pgId]: contacts }));
           } else {
-            alert("Unable to unlock contact details. Please try again.");
+            showToast("Unable to unlock contact details. Please try again.", "error");
           }
         } catch (err) {
-          alert("Error unlocking contacts: " + err.message);
+          showToast("Error unlocking contacts: " + err.message, "error");
         }
       }
     } else {
@@ -259,7 +324,12 @@ export default function App() {
         "You have 0 credits remaining! Would you like to buy a contact views package?"
       );
       if (buyCredits) {
-        setShowPurchaseModal(true);
+        if (!currentUser) {
+          showToast("Please sign in or create an account to buy credits.", "info");
+          setShowAuthModal(true);
+        } else {
+          setShowPurchaseModal(true);
+        }
       }
     }
   };
@@ -273,7 +343,7 @@ export default function App() {
       setUserCredits(newBalance);
     } catch (err) {
       console.error("Error adding credits:", err);
-      alert("Failed to add credits. Please try again.");
+      showToast("Failed to add credits. Please try again.", "error");
     }
   };
 
@@ -284,9 +354,6 @@ export default function App() {
       [amenity]: !prev[amenity]
     }));
   };
-
-  // Default search localities for students/professionals
-  const DEFAULT_LOCALITIES = ['SG Palya', 'Koramangala', 'HSR Layout', 'BTM Layout', 'Marathahalli'];
 
   // Helper to format locality for URL
   const getLocalitySlug = (loc) => {
@@ -357,8 +424,8 @@ export default function App() {
       return false;
     }
 
-    // 2. Locality Filter (case-insensitive)
-    if (selectedLocality !== 'all' && pg.locality.toLowerCase() !== selectedLocality.toLowerCase()) {
+    // 2. Locality Filter (case-insensitive partial match)
+    if (selectedLocality !== 'all' && !pg.locality.toLowerCase().includes(selectedLocality.toLowerCase()) && !selectedLocality.toLowerCase().includes(pg.locality.toLowerCase())) {
       return false;
     }
 
@@ -387,12 +454,9 @@ export default function App() {
 
   return (
     <>
-      {/* Premium Animated Background Grid & Aurora Blobs */}
+      {/* Clean Minimalist Background Grid */}
       <div className="animated-bg-blobs">
         <div className="bg-grid-overlay"></div>
-        <div className="bg-blob blob-1"></div>
-        <div className="bg-blob blob-2"></div>
-        <div className="bg-blob blob-3"></div>
       </div>
 
       <Header 
@@ -401,12 +465,19 @@ export default function App() {
         adminUser={adminUser}
         onLogout={handleLogout}
         userCredits={userCredits}
-        onOpenPurchaseModal={() => setShowPurchaseModal(true)}
+        onOpenPurchaseModal={handleOpenPurchaseModal}
         theme={theme}
         toggleTheme={toggleTheme}
+        currentUser={currentUser}
+        onOpenAuthModal={() => {
+          console.log("onOpenAuthModal called in App.jsx, setting showAuthModal to true");
+          setShowAuthModal(true);
+        }}
+        onLogoutUser={handleLogoutUser}
+        onOpenAccountCentre={() => setShowAccountCentre(true)}
       />
 
-      <main style={{ flexGrow: 1, position: 'relative', zIndex: 1 }}>
+      <main style={{ flexGrow: 1, position: 'relative', zIndex: 1 }} className="app-main-content">
         {isAdminMode ? (
           // ==========================================
           // ADMIN PORTAL VIEW
@@ -416,6 +487,8 @@ export default function App() {
             onLoginSuccess={(user) => setAdminUser(user)}
             pgs={pgs}
             onAddPG={handleAddPG}
+            onUpdatePG={handleUpdatePG}
+            getAdminPGContactDetails={getAdminPGContactDetails}
             onDeletePG={handleDeletePG}
             isFirebaseActive={isFirebaseActive}
           />
@@ -433,11 +506,11 @@ export default function App() {
                     <span className="hero-tagline">✨ Zero Brokerage Co-living</span>
                     {selectedLocality === 'all' ? (
                       <h1 className="hero-main-title" style={{ margin: 0 }}>
-                        Zero brokerage — <span className="text-highlight">contact owners</span> directly
+                        <DecryptedText text="Zero brokerage — contact owners directly" animateOn="view" useOriginalCharsOnly />
                       </h1>
                     ) : (
                       <h1 className="hero-main-title" style={{ margin: 0 }}>
-                        Zero brokerage PGs in <span className="text-highlight">{selectedLocality}</span> — contact owners directly
+                        <DecryptedText text={`PGs in ${selectedLocality}`} animateOn="view" useOriginalCharsOnly />
                       </h1>
                     )}
                     <p className="campaign-hero-subtitle body-md" style={{ textAlign: 'left', maxWidth: '540px', margin: 0 }}>
@@ -469,16 +542,20 @@ export default function App() {
                     <div className="search-bar-pill" style={{ width: '100%', marginTop: '8px' }}>
                       <div className="search-field-segment">
                         <span className="caption">Where</span>
-                        <select 
+                        <input 
+                          type="text"
+                          list="global-search-localities"
                           className="search-segment-input"
-                          value={selectedLocality}
-                          onChange={(e) => handleLocalityChange(e.target.value)}
-                        >
-                          <option value="all">Search localities</option>
+                          placeholder="Search localities..."
+                          value={selectedLocality === 'all' ? '' : selectedLocality}
+                          onChange={(e) => handleLocalityChange(e.target.value || 'all')}
+                          style={{ backgroundImage: 'none', paddingRight: 0 }}
+                        />
+                        <datalist id="global-search-localities">
                           {availableLocalities.filter(l => l !== 'all').map(loc => (
-                            <option key={loc} value={loc}>{loc}</option>
+                            <option key={loc} value={loc} />
                           ))}
-                        </select>
+                        </datalist>
                       </div>
 
                       <div className="search-field-segment">
@@ -526,44 +603,74 @@ export default function App() {
                   <div className="hero-right scroll-reveal" style={{ '--reveal-delay': '1' }}>
                     <div className="savings-calc-card">
                       <div className="calc-header">
-                        <span className="calc-badge">💰 Zero-Brokerage Savings</span>
+                        <span className="calc-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Coins size={12} /> Zero-Brokerage Savings
+                        </span>
                         <h3 className="calc-title" style={{ margin: 0 }}>Brokerage Calculator</h3>
                       </div>
                       
-                      <div className="calc-slider-group">
-                        <div className="slider-label-row">
-                          <span>Target Monthly Rent</span>
-                          <span className="slider-value">₹{rentValue.toLocaleString('en-IN')}</span>
-                        </div>
-                        <input 
-                          type="range" 
-                          min="5000" 
-                          max="30000" 
-                          step="1000" 
-                          value={rentValue} 
-                          onChange={(e) => setRentValue(Number(e.target.value))}
-                          className="calc-range-slider"
-                        />
-                        <div className="slider-ticks">
-                          <span>₹5k</span>
-                          <span>₹15k</span>
-                          <span>₹30k</span>
-                        </div>
-                      </div>
+                      <div className="calc-body">
+                        <div className="calc-control-panel">
+                          <div className="calc-slider-group">
+                            <div className="slider-label-row">
+                              <span className="slider-title">Monthly Rent Target</span>
+                              <span className="slider-value">₹{rentValue.toLocaleString('en-IN')}</span>
+                            </div>
+                            <input 
+                              type="range" 
+                              min="5000" 
+                              max="30000" 
+                              step="1000" 
+                              value={rentValue} 
+                              onChange={(e) => setRentValue(Number(e.target.value))}
+                              className="calc-range-slider"
+                              style={{ '--slider-progress': `${((rentValue - 5000) / 25000) * 100}%` }}
+                            />
+                            <div className="slider-ticks">
+                              <span>₹5k</span>
+                              <span>₹15k</span>
+                              <span>₹30k</span>
+                            </div>
+                          </div>
 
-                      <div className="calc-results">
-                        <div className="result-item">
-                          <span className="result-label">Agent Brokerage Cost (1 Month)</span>
-                          <span className="result-val negative">₹{rentValue.toLocaleString('en-IN')}</span>
+                          <div className="savings-comparison-list">
+                            <div className="comparison-row">
+                              <div className="comparison-info">
+                                <span className="icon-badge negative">✕</span>
+                                <div>
+                                  <span className="comparison-label">Broker Agent route</span>
+                                  <span className="comparison-desc">1 Month Rent Lost forever</span>
+                                </div>
+                              </div>
+                              <span className="comparison-cost negative">₹{rentValue.toLocaleString('en-IN')}</span>
+                            </div>
+
+                            <div className="comparison-row">
+                              <div className="comparison-info">
+                                <span className="icon-badge positive">✓</span>
+                                <div>
+                                  <span className="comparison-label">PG wala direct route</span>
+                                  <span className="comparison-desc">Unlock contact fee only</span>
+                                </div>
+                              </div>
+                              <span className="comparison-cost positive">₹49</span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="result-item">
-                          <span className="result-label">PG wala Unlock Fee</span>
-                          <span className="result-val positive">₹49</span>
-                        </div>
-                        <div className="result-divider"></div>
-                        <div className="result-item total">
-                          <span className="result-label">Total Savings</span>
-                          <span className="result-val total-savings">₹{(rentValue - 49).toLocaleString('en-IN')}</span>
+
+                        <div className="savings-visualizer-panel">
+                          <div className="liquid-savings-container">
+                            <div className="liquid-orb">
+                              {/* Large Rupee Watermark Symbol */}
+                              <div className="rupee-watermark">₹</div>
+                              
+                              <div className="liquid-content">
+                                <span className="liquid-label">YOU SAVE</span>
+                                <span className="liquid-amount">₹{(rentValue - 49).toLocaleString('en-IN')}</span>
+                                <span className="liquid-percent">{Math.round(((rentValue - 49) / rentValue) * 100)}% Saved</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -583,84 +690,119 @@ export default function App() {
               </div>
             </section>
 
-            {/* Explore Hubs Section */}
-            <section className="hubs-section container" style={{ width: '100%' }}>
-              <div className="scroll-reveal" style={{ marginBottom: '28px', textAlign: 'left' }}>
-                <h3 className="section-title" style={{ margin: 0 }}>Explore Bangalore's top co-living hubs</h3>
-                <p className="body-sm" style={{ color: 'var(--colors-muted)', margin: '4px 0 0 0' }}>Quick filter by Bangalore's most popular professional neighborhoods</p>
-              </div>
-
-              <div className="hubs-grid">
-                {[
-                  { id: 'SG Palya', name: 'SG Palya', tag: 'Student Hub', desc: 'Popular among Christ University students & young professionals' },
-                  { id: 'Koramangala', name: 'Koramangala', tag: 'Startup Hub', desc: 'Vibrant cafe culture, tech startups & tree-lined avenues' },
-                  { id: 'HSR Layout', name: 'HSR Layout', tag: 'Tech Oasis', desc: 'Wide sectors, startups, parks & workspace hubs' },
-                  { id: 'BTM Layout', name: 'BTM Layout', tag: 'Co-living Hub', desc: 'PG hotspot with great connectivity & affordable eating joints' },
-                  { id: 'Marathahalli', name: 'Marathahalli', tag: 'IT Capital', desc: 'Close to ORR IT parks, shopping hubs & arterial transit lines' }
-                ].map((hub, index) => {
-                  const count = pgs.filter(pg => pg.locality.toLowerCase() === hub.id.toLowerCase()).length;
-                  return (
-                    <div 
-                      key={hub.id} 
-                      className="hub-card scroll-reveal" 
-                      onClick={() => {
-                        handleLocalityChange(hub.id);
-                        const gridEl = document.getElementById('catalog-grid');
-                        gridEl?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      style={{ cursor: 'pointer', '--reveal-delay': index }}
-                    >
-                      <div className="hub-card-number">0{index + 1}</div>
-                      <div className="hub-card-content">
-                        <span className="hub-badge">{hub.tag}</span>
-                        <h4 className="hub-name">{hub.name}</h4>
-                        <p className="hub-desc">{hub.desc}</p>
-                        <span className="hub-count">{count} {count === 1 ? 'property' : 'properties'} →</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
             {/* Main Marketplace catalog grid */}
             <div className="container section-gap" id="catalog-grid" style={{ width: '100%' }}>
               
-              {/* Keyword Search text input */}
-              <div className="form-group scroll-reveal" style={{ maxWidth: '400px', marginBottom: '32px' }}>
-                <label className="form-label" style={{ fontSize: '12px' }}>Keywords Search</label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
-                  <Search size={16} style={{ position: 'absolute', left: '14px', color: 'var(--colors-muted)' }} />
+              {/* Sticky Filter Bar */}
+              <div className="sticky-filter-bar scroll-reveal" style={{ 
+                position: 'sticky', 
+                top: '72px', 
+                zIndex: 200, 
+                backgroundColor: 'var(--colors-surface-card)', 
+                border: '1px solid var(--colors-hairline)', 
+                borderRadius: 'var(--rounded-md)',
+                padding: '12px 16px',
+                boxShadow: 'var(--shadow-sm)',
+                marginBottom: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px'
+              }}>
+                {/* Search field input */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 250px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '12px', color: 'var(--colors-muted)' }} />
                   <input 
                     type="text" 
                     className="form-input" 
-                    placeholder="Search e.g. single sharing, wifi, security"
+                    placeholder="Search by keywords (single room, wifi...)"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ paddingLeft: '40px', borderRadius: 'var(--rounded-full)', height: '44px' }}
+                    style={{ paddingLeft: '34px', borderRadius: 'var(--rounded-full)', height: '36px', fontSize: '12px', marginBottom: 0 }}
                   />
                 </div>
+
+                {/* Desktop-only selectors */}
+                <div className="desktop-filters-row" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input 
+                    type="text"
+                    list="global-search-localities"
+                    className="form-input" 
+                    placeholder="All Localities"
+                    value={selectedLocality === 'all' ? '' : selectedLocality}
+                    onChange={e => handleLocalityChange(e.target.value || 'all')}
+                    style={{ height: '36px', padding: '0 12px', fontSize: '12px', width: '130px', marginBottom: 0 }}
+                  />
+
+                  <select 
+                    className="form-input" 
+                    value={selectedGender} 
+                    onChange={e => setSelectedGender(e.target.value)}
+                    style={{ height: '36px', padding: '0 12px', fontSize: '12px', width: '120px', marginBottom: 0 }}
+                  >
+                    <option value="all">Any Gender</option>
+                    <option value="boys">Boys Only</option>
+                    <option value="girls">Girls Only</option>
+                    <option value="unisex">Coliving</option>
+                  </select>
+
+                  <select 
+                    className="form-input" 
+                    value={selectedPriceRange} 
+                    onChange={e => setSelectedPriceRange(e.target.value)}
+                    style={{ height: '36px', padding: '0 12px', fontSize: '12px', width: '120px', marginBottom: 0 }}
+                  >
+                    <option value="all">Any Budget</option>
+                    <option value="under-10000">Under ₹10k</option>
+                    <option value="10000-15000">₹10k - ₹15k</option>
+                    <option value="above-15000">Above ₹15k</option>
+                  </select>
+                </div>
+
+                {/* Mobile Filter sheet Trigger Button */}
+                <button 
+                  className="btn btn-secondary mobile-filters-trigger"
+                  onClick={() => setShowMobileFilters(true)}
+                  style={{ display: 'none', height: '36px', padding: '0 16px', fontSize: '12px', width: 'auto', alignItems: 'center', gap: '6px', marginBottom: 0, fontWeight: 700 }}
+                >
+                  <SlidersHorizontal size={12} />
+                  <span>Filters</span>
+                </button>
               </div>
 
-              {/* Inactive & Inverted filter chips for Amenities */}
-              <div className="scroll-reveal" style={{ textAlign: 'left', marginBottom: '40px', width: '100%' }}>
-                <span className="caption" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <SlidersHorizontal size={14} />
-                  <span>Filter by Amenities</span>
-                </span>
-                
-                <div className="filter-chips-row">
-                  {['wifi', 'food', 'ac', 'gym', 'laundry', 'backup', 'security', 'parking'].map(amenity => (
-                    <button
-                      key={amenity}
-                      className={`filter-chip ${selectedAmenities[amenity] ? 'active' : ''}`}
-                      onClick={() => handleFilterAmenityToggle(amenity)}
-                      style={{ textTransform: 'capitalize' }}
-                    >
-                      {amenity === 'backup' ? 'Power Backup' : amenity}
-                    </button>
-                  ))}
-                </div>
+              {/* Quick Filter Chips (Instantly updates states) */}
+              <div className="quick-filter-chips scroll-reveal" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '32px' }}>
+                <button 
+                  className={`filter-chip ${selectedPriceRange === 'under-10000' ? 'active' : ''}`}
+                  onClick={() => setSelectedPriceRange(prev => prev === 'under-10000' ? 'all' : 'under-10000')}
+                >
+                  Under ₹10k
+                </button>
+                <button 
+                  className={`filter-chip ${selectedAmenities.ac ? 'active' : ''}`}
+                  onClick={() => handleFilterAmenityToggle('ac')}
+                >
+                  Air Conditioned (AC)
+                </button>
+                <button 
+                  className={`filter-chip ${selectedGender === 'girls' ? 'active' : ''}`}
+                  onClick={() => setSelectedGender(prev => prev === 'girls' ? 'all' : 'girls')}
+                >
+                  Girls Only
+                </button>
+                <button 
+                  className={`filter-chip ${selectedGender === 'unisex' ? 'active' : ''}`}
+                  onClick={() => setSelectedGender(prev => prev === 'unisex' ? 'all' : 'unisex')}
+                >
+                  Coliving
+                </button>
+                <button 
+                  className={`filter-chip ${selectedPriceRange === '10000-15000' ? 'active' : ''}`}
+                  onClick={() => setSelectedPriceRange(prev => prev === '10000-15000' ? 'all' : '10000-15000')}
+                >
+                  ₹10k - ₹15k
+                </button>
               </div>
 
               {/* Grid Header */}
@@ -716,7 +858,7 @@ export default function App() {
                       Reset All Filters
                     </button>
                     <button 
-                      className="btn btn-primary btn-sm"
+                      className="btn btn-primary" 
                       onClick={() => setShowListModal(true)}
                       style={{ width: 'auto', padding: '8px 18px', minHeight: '34px' }}
                     >
@@ -730,6 +872,7 @@ export default function App() {
                     <div key={pg.id} className="scroll-reveal" style={{ '--reveal-delay': index % 8 }}>
                       <PGCard 
                         pg={pg} 
+                        isUnlocked={unlockedPGIds.includes(pg.id)}
                         onViewDetails={async (selected) => {
                           setSelectedPG(selected);
                           if (unlockedPGIds.includes(selected.id) && !unlockedContacts[selected.id]) {
@@ -750,6 +893,69 @@ export default function App() {
               )}
             </div>
 
+            {/* Explore Hubs Section */}
+            <section className="hubs-section container" style={{ width: '100%', position: 'relative' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '28px' }}>
+                <div className="scroll-reveal" style={{ textAlign: 'left' }}>
+                  <h3 className="section-title" style={{ margin: 0 }}>Explore Bangalore's top co-living hubs</h3>
+                  <p className="body-sm" style={{ color: 'var(--colors-muted)', margin: '4px 0 0 0' }}>Quick filter by Bangalore's most popular professional neighborhoods</p>
+                </div>
+                
+                {/* Scroll Navigation Buttons */}
+                <div className="desktop-only" style={{ display: 'flex', gap: '8px' }}>
+                  <button 
+                    onClick={() => scrollHubs('left')}
+                    className="btn btn-secondary" 
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'unset' }}
+                    aria-label="Scroll hubs left"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <button 
+                    onClick={() => scrollHubs('right')}
+                    className="btn btn-secondary" 
+                    style={{ width: '38px', height: '38px', borderRadius: '50%', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 'unset' }}
+                    aria-label="Scroll hubs right"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div ref={hubsGridRef} className="hubs-grid" style={{ scrollBehavior: 'smooth' }}>
+                {[
+                  { id: 'SG Palya', name: 'SG Palya', tag: 'Student Hub', desc: 'Popular among Christ University students & young professionals', image: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=600&q=80' },
+                  { id: 'Koramangala', name: 'Koramangala', tag: 'Startup Hub', desc: 'Vibrant cafe culture, tech startups & tree-lined avenues', image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=600&q=80' },
+                  { id: 'HSR Layout', name: 'HSR Layout', tag: 'Tech Oasis', desc: 'Wide sectors, startups, parks & workspace hubs', image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=600&q=80' },
+                  { id: 'BTM Layout', name: 'BTM Layout', tag: 'Co-living Hub', desc: 'PG hotspot with great connectivity & affordable eating joints', image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80' },
+                  { id: 'Marathahalli', name: 'Marathahalli', tag: 'IT Capital', desc: 'Close to ORR IT parks, shopping hubs & arterial transit lines', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80' }
+                ].map((hub, index) => {
+                  const count = pgs.filter(pg => pg.locality.toLowerCase() === hub.id.toLowerCase()).length;
+                  return (
+                    <div 
+                      key={hub.id} 
+                      className={`hub-card scroll-reveal ${index === 0 ? 'featured' : ''}`} 
+                      onClick={() => {
+                        handleLocalityChange(hub.id);
+                        const gridEl = document.getElementById('catalog-grid');
+                        gridEl?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      style={{ cursor: 'pointer', '--reveal-delay': index }}
+                    >
+                      <div className="hub-card-bg" style={{ backgroundImage: `url(${hub.image})` }}></div>
+                      <div className="hub-card-overlay"></div>
+                      <div className="hub-card-number">0{index + 1}</div>
+                      <div className="hub-card-content">
+                        <span className="hub-badge">{hub.tag}</span>
+                        <h4 className="hub-name">{hub.name}</h4>
+                        <p className="hub-desc">{hub.desc}</p>
+                        <span className="hub-count">{count} {count === 1 ? 'property' : 'properties'} →</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
             {/* How It Works Step Guide */}
             <section className="how-it-works container" style={{ width: '100%' }}>
               <div className="scroll-reveal" style={{ textAlign: 'center', marginBottom: '48px' }}>
@@ -777,6 +983,65 @@ export default function App() {
                 </div>
               </div>
             </section>
+            
+            {/* About Us Premium Section */}
+            <section id="about-section" className="about-us-section container section-gap" style={{ width: '100%', borderTop: '1px solid var(--colors-hairline)', paddingTop: '64px' }}>
+              <div className="hero-split-layout" style={{ gap: '32px' }}>
+                <div className="scroll-reveal" style={{ textAlign: 'left' }}>
+                  <span className="hero-tagline" style={{ display: 'inline-block', marginBottom: '16px' }}>🔑 About PG wala</span>
+                  <h3 className="section-title" style={{ margin: '0 0 16px 0', fontSize: '32px', lineHeight: 1.2 }}>
+                    Simplifying co-living in Bangalore <span className="text-highlight">without the broker fee</span>
+                  </h3>
+                  <p className="body-md" style={{ color: 'var(--colors-body)', lineHeight: 1.7, marginBottom: '16px' }}>
+                    Finding a comfortable, managed room in Bangalore shouldn't cost you an arm and a leg. Traditional platforms force you to talk to brokers who charge up to a full month's rent as a commission fee for simply sharing a phone number.
+                  </p>
+                  <p className="body-md" style={{ color: 'var(--colors-body)', lineHeight: 1.7 }}>
+                    <strong>PG wala</strong> was founded to disrupt this outdated system. We connect paying guests directly with property owners and hosts. By checking verification certificates, managing amenities details, and offering direct chat routes, we make co-living secure, simple, and entirely brokerage-free.
+                  </p>
+                </div>
+
+                <div className="scroll-reveal" style={{ display: 'flex', flexDirection: 'column', gap: '16px', '--reveal-delay': '1' }}>
+                  <div style={{ 
+                    backgroundColor: 'var(--colors-surface-card)', 
+                    border: '1px solid var(--colors-hairline)', 
+                    borderRadius: 'var(--rounded-md)',
+                    padding: '20px',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}>
+                    <h4 style={{ margin: '0 0 6px 0', color: 'var(--colors-primary)', fontWeight: 700, fontSize: '16px' }}>🚫 Zero Brokerage, Period</h4>
+                    <p className="body-sm" style={{ margin: 0, color: 'var(--colors-muted)', lineHeight: 1.5 }}>
+                      We do not charge commissions, processing fees, or hidden charges. Pay host contacts directly and save thousands.
+                    </p>
+                  </div>
+
+                  <div style={{ 
+                    backgroundColor: 'var(--colors-surface-card)', 
+                    border: '1px solid var(--colors-hairline)', 
+                    borderRadius: 'var(--rounded-md)',
+                    padding: '20px',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}>
+                    <h4 style={{ margin: '0 0 6px 0', color: 'var(--colors-primary)', fontWeight: 700, fontSize: '16px' }}>🛡️ 100% Verified Hosts</h4>
+                    <p className="body-sm" style={{ margin: 0, color: 'var(--colors-muted)', lineHeight: 1.5 }}>
+                      Every PG listed on our marketplace has undergone a direct checklist audit to confirm rooms, furnishing, amenities, and security.
+                    </p>
+                  </div>
+
+                  <div style={{ 
+                    backgroundColor: 'var(--colors-surface-card)', 
+                    border: '1px solid var(--colors-hairline)', 
+                    borderRadius: 'var(--rounded-md)',
+                    padding: '20px',
+                    boxShadow: 'var(--shadow-sm)'
+                  }}>
+                    <h4 style={{ margin: '0 0 6px 0', color: 'var(--colors-primary)', fontWeight: 700, fontSize: '16px' }}>💬 Direct Owner Connection</h4>
+                    <p className="body-sm" style={{ margin: 0, color: 'var(--colors-muted)', lineHeight: 1.5 }}>
+                      Unlock phone numbers or chat on WhatsApp to coordinate virtual or physical site visits immediately.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </main>
@@ -801,6 +1066,28 @@ export default function App() {
         />
       )}
 
+      {/* Auth Modal overlay */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onAuthSuccess={handleAuthSuccess}
+      />
+
+      {/* Account Centre Modal overlay */}
+      <AccountCentreModal 
+        isOpen={showAccountCentre}
+        onClose={() => setShowAccountCentre(false)}
+        currentUser={currentUser}
+        userCredits={userCredits}
+        onOpenPurchaseModal={() => {
+          setShowAccountCentre(false);
+          setShowPurchaseModal(true);
+        }}
+        onLogout={handleLogoutUser}
+        pgs={pgs}
+        unlockedPGIds={unlockedPGIds}
+      />
+
       {/* Mobile Sticky Bottom Bar */}
       {!isAdminMode && (
         <div className="mobile-sticky-bar">
@@ -811,13 +1098,13 @@ export default function App() {
               gridEl?.scrollIntoView({ behavior: 'smooth' });
             }}
           >
-            🔍 Search Catalog
+            <Search size={14} /> Search Catalog
           </button>
           <button 
             className="mobile-sticky-btn primary"
             onClick={() => setShowListModal(true)}
           >
-            🏠 List PG Free
+            <Home size={14} /> List PG Free
           </button>
         </div>
       )}
@@ -841,6 +1128,13 @@ export default function App() {
       {showTerms && (
         <TermsModal 
           onClose={() => setShowTerms(false)}
+        />
+      )}
+
+      {/* Privacy Policy Modal overlay */}
+      {showPrivacy && (
+        <PrivacyModal 
+          onClose={() => setShowPrivacy(false)}
         />
       )}
 
@@ -877,7 +1171,7 @@ export default function App() {
           <div className="footer-bottom" style={{ width: '100%' }}>
             <div className="caption-sm" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
               <span>© {new Date().getFullYear()} PG wala, Inc.</span>
-              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Privacy</a>
+              <button onClick={() => setShowPrivacy(true)} className="footer-link-btn-flat">Privacy</button>
               <span>·</span>
               <button onClick={() => setShowTerms(true)} className="footer-link-btn-flat">Terms</button>
               <span>·</span>
@@ -885,35 +1179,177 @@ export default function App() {
               <span>·</span>
               <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Company details</a>
             </div>
-            <div className="caption-sm" style={{ fontWeight: 600, display: 'flex', gap: '12px' }}>
-              <span>🌐 English (US)</span>
-              <span>₹ INR</span>
+            <div className="caption-sm" style={{ fontWeight: 600, display: 'flex', gap: '16px', alignItems: 'center' }}>
+              <button className="footer-link-btn-flat" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Globe size={14} />
+                <span>English (US)</span>
+              </button>
+              <button className="footer-link-btn-flat" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <span>₹</span>
+                <span>INR</span>
+              </button>
             </div>
           </div>
         </div>
       </footer>
 
-      {showLoader && (
-        <div className={`page-loader-overlay ${loaderFade ? 'fade-out' : ''}`}>
-          <div className="premium-loader-container">
-            <div className="premium-loader-card">
-              {/* Brand Logo with pulsing indicator */}
-              <div className="premium-loader-logo">
-                <span>pg.wala</span>
-                <span className="premium-loader-dot"></span>
+      {/* Toast Notification Container */}
+      <div className="toast-container" style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 99999, display: 'flex', flexDirection: 'column', gap: '10px', maxWidth: '350px' }}>
+        {toasts.map(t => (
+          <div 
+            key={t.id} 
+            className={`toast-item ${t.type}`} 
+            style={{ 
+              padding: '12px 16px', 
+              borderRadius: 'var(--rounded-md)', 
+              backgroundColor: t.type === 'error' ? '#ef4444' : (t.type === 'success' ? '#10b981' : '#3b82f6'), 
+              color: '#ffffff', 
+              fontSize: '13px', 
+              fontWeight: 600, 
+              boxShadow: 'var(--shadow-lg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px'
+            }}
+          >
+            <span>{t.message}</span>
+            <button 
+              onClick={() => setToasts(prev => prev.filter(item => item.id !== t.id))}
+              style={{ background: 'none', border: 'none', color: '#ffffff', cursor: 'pointer', fontSize: '14px', padding: 0 }}
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Mobile Filters Bottom Sheet */}
+      {showMobileFilters && (
+        <div className="mobile-bottom-sheet-overlay" onClick={() => setShowMobileFilters(false)}>
+          <div className="mobile-bottom-sheet" onClick={e => e.stopPropagation()}>
+            <div className="sheet-header">
+              <span className="sheet-title">Filter Listings</span>
+              <button className="sheet-close" onClick={() => setShowMobileFilters(false)}>✕</button>
+            </div>
+            <div className="sheet-body">
+              <div className="form-group">
+                <label className="form-label" htmlFor="mobile-locality-select">Locality</label>
+                <input 
+                  type="text"
+                  id="mobile-locality-select"
+                  list="global-search-localities"
+                  className="form-input" 
+                  placeholder="All localities"
+                  value={selectedLocality === 'all' ? '' : selectedLocality}
+                  onChange={e => handleLocalityChange(e.target.value || 'all')}
+                />
               </div>
-              
-              {/* Double Ring Geometric Spinner */}
-              <div className="premium-spinner">
-                <div className="spinner-ring"></div>
-                <div className="spinner-ring-inner"></div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="mobile-gender-select">Gender Preference</label>
+                <select id="mobile-gender-select" className="form-input" value={selectedGender} onChange={e => setSelectedGender(e.target.value)}>
+                  <option value="all">Any Gender</option>
+                  <option value="boys">Boys Only</option>
+                  <option value="girls">Girls Only</option>
+                  <option value="unisex">Coliving / Unisex</option>
+                </select>
               </div>
-              
-              <p className="premium-loader-text">{statusText}</p>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="mobile-price-select">Monthly Rent</label>
+                <select id="mobile-price-select" className="form-input" value={selectedPriceRange} onChange={e => setSelectedPriceRange(e.target.value)}>
+                  <option value="all">Any budget</option>
+                  <option value="under-10000">Under ₹10,000</option>
+                  <option value="10000-15000">₹10,000 - ₹15,000</option>
+                  <option value="above-15000">Above ₹15,000</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Amenities</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                  {['wifi', 'food', 'ac', 'gym', 'laundry', 'backup', 'security', 'parking'].map(amenity => (
+                    <button
+                      key={`sheet-${amenity}`}
+                      className={`filter-chip ${selectedAmenities[amenity] ? 'active' : ''}`}
+                      onClick={() => handleFilterAmenityToggle(amenity)}
+                      style={{ textTransform: 'capitalize' }}
+                    >
+                      {amenity === 'backup' ? 'Power Backup' : amenity}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* 3-Step Onboarding Modal */}
+      {showOnboarding && (
+        <div className="modal-overlay" style={{ zIndex: 99999 }}>
+          <div className="modal-content" style={{ maxWidth: '480px', padding: '36px', borderRadius: 'var(--rounded-md)' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--colors-accent-blue)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+                How It Works • Step {onboardingStep} of 3
+              </div>
+              
+              {onboardingStep === 1 && (
+                <div>
+                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}><span role="img" aria-hidden="true">🔍</span> 1. Search Localities</h3>
+                  <p className="body-md" style={{ color: 'var(--colors-muted)', lineHeight: '1.6', marginBottom: '24px', fontSize: '13px' }}>
+                    Explore verified co-living properties in Bangalore's tech hubs like HSR, Koramangala, Indiranagar, and Whitefield. Use filters to match your budget and gender preferences.
+                  </p>
+                </div>
+              )}
+
+              {onboardingStep === 2 && (
+                <div>
+                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}><span role="img" aria-hidden="true">🔑</span> 2. Unlock Direct Contacts</h3>
+                  <p className="body-md" style={{ color: 'var(--colors-muted)', lineHeight: '1.6', marginBottom: '24px', fontSize: '13px' }}>
+                    Pay a nominal 1 credit (₹49) to unlock the host's direct phone number and WhatsApp. Skip the spammy agent calls.
+                  </p>
+                </div>
+              )}
+
+              {onboardingStep === 3 && (
+                <div>
+                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}><span role="img" aria-hidden="true">🏠</span> 3. Move In & Save</h3>
+                  <p className="body-md" style={{ color: 'var(--colors-muted)', lineHeight: '1.6', marginBottom: '24px', fontSize: '13px' }}>
+                    Negotiate directly with property owners and move in! Save up to ₹15,000+ in agent brokerage commissions.
+                  </p>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '24px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: onboardingStep === 1 ? 'var(--colors-primary)' : 'var(--colors-hairline-soft)' }} />
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: onboardingStep === 2 ? 'var(--colors-primary)' : 'var(--colors-hairline-soft)' }} />
+                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: onboardingStep === 3 ? 'var(--colors-primary)' : 'var(--colors-hairline-soft)' }} />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+                {onboardingStep > 1 && (
+                  <button className="btn btn-secondary" onClick={() => setOnboardingStep(prev => prev - 1)} style={{ width: 'auto', padding: '8px 20px', minHeight: '36px' }}>
+                    Back
+                  </button>
+                )}
+                {onboardingStep < 3 ? (
+                  <button className="btn btn-primary" onClick={() => setOnboardingStep(prev => prev + 1)} style={{ width: 'auto', padding: '8px 20px', minHeight: '36px' }}>
+                    Next
+                  </button>
+                ) : (
+                  <button className="btn btn-primary" onClick={closeOnboarding} style={{ width: 'auto', padding: '8px 20px', minHeight: '36px' }}>
+                    Get Started
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Analytics />
     </>
   );
 }

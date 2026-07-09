@@ -1,7 +1,55 @@
-import React from 'react';
-import { X, TrendingUp, Sparkles, Heart, Accessibility, ShieldCheck } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { X, TrendingUp, Sparkles, Heart, Accessibility, ShieldCheck, Compass } from 'lucide-react';
 
 export default function InfoModal({ type, onClose }) {
+  const modalRef = useRef(null);
+
+  // Focus trap & Escape close for accessibility
+  useEffect(() => {
+    if (modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll('button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (!modalRef.current) return;
+        const focusableElements = Array.from(
+          modalRef.current.querySelectorAll(
+            'button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+        
+        if (focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !modalRef.current.contains(document.activeElement)) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement || !modalRef.current.contains(document.activeElement)) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const pageData = {
     investors: {
       title: "Investor Relations",
@@ -82,6 +130,63 @@ export default function InfoModal({ type, onClose }) {
           text: "If you need help navigating our website or finding a PG that accommodates specific physical requirements, please contact our support desk."
         }
       ]
+    },
+    privacy: {
+      title: "Privacy Policy",
+      subtitle: "How we protect and handle your personal data",
+      icon: ShieldCheck,
+      sections: [
+        {
+          heading: "1. Data We Collect",
+          text: "We collect personal information that you provide to us, including your name, email address, phone number, and WhatsApp contact details when you inquire about properties or unlock host contact details."
+        },
+        {
+          heading: "2. How We Use Data",
+          text: "We use your contact details solely to connect you with PG hosts and verify accounts. Your details are never sold, rented, or shared with third-party marketers."
+        },
+        {
+          heading: "3. Local Storage Preferences",
+          text: "We use browser local storage to save your visual theme preferences (light/dark mode) and authorization sessions securely. No tracking cookies are used."
+        },
+        {
+          heading: "4. User Rights (GDPR & compliance)",
+          text: "You can request to export or delete your user record and listings at any time by contacting our privacy compliance desk at privacy@pgwala.com."
+        }
+      ]
+    },
+    sitemap: {
+      title: "Sitemap",
+      subtitle: "Directory routes and co-living hubs",
+      icon: Compass,
+      sections: [
+        {
+          heading: "Active Locality Pages",
+          text: "PG in Koramangala · PG in SG Palya · PG in HSR Layout · PG in Indiranagar · PG in Whitefield · PG in BTM Layout"
+        },
+        {
+          heading: "Dashboard & Admin Sessions",
+          text: "Catalog Listings Directory · Host Portal Credentials Login · Password Reset Flow Sandbox"
+        }
+      ]
+    },
+    company: {
+      title: "Company Details",
+      subtitle: "Corporate registry and contact information",
+      icon: ShieldCheck,
+      sections: [
+        {
+          heading: "Corporate Identity",
+          text: "PG wala Community Directory Private Limited. CIN: U74999KA2026PTC123456."
+        },
+        {
+          heading: "Registered Address",
+          text: "80 Feet Road, 4th Block, Koramangala, Bengaluru, Karnataka 560034, India."
+        },
+        {
+          heading: "Grievance Redressal",
+          text: "For legal, trademark, or user inquiries, reach out to grievance@pgwala.com."
+        }
+      ]
     }
   };
 
@@ -91,7 +196,7 @@ export default function InfoModal({ type, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)' }}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} ref={modalRef} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)' }}>
         <button className="modal-close-btn" onClick={onClose} aria-label="Close Info Page">
           <X size={18} />
         </button>

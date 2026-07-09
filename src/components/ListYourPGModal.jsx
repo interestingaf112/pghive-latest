@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react';
-import { X, UploadCloud, Image as ImageIcon, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, UploadCloud, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
+import { BANGALORE_LOCALITIES } from '../utils/constants';
 
 export default function ListYourPGModal({ onClose, onAddPG }) {
   const [pgName, setPgName] = useState('');
@@ -11,7 +12,6 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
   const [pgFurnishing, setPgFurnishing] = useState('Semi Furnished');
   const [pgAvailableFrom, setPgAvailableFrom] = useState('Immediate');
   const [pgContactPhone, setPgContactPhone] = useState('');
-  const [pgContactEmail, setPgContactEmail] = useState('');
   const [pgContactWhatsapp, setPgContactWhatsapp] = useState('');
   
   const [selectedAmenities, setSelectedAmenities] = useState({
@@ -28,15 +28,59 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
   const [selectedImages, setSelectedImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const fileInputRef = useRef(null);
+  const modalRef = useRef(null);
 
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const localities = [
-    'SG Palya', 'Koramangala', 'HSR Layout', 'BTM Layout', 'Marathahalli',
-    'Indiranagar', 'Whitefield', 'Electronic City', 'Jayanagar'
-  ];
+  // Focus trap & Escape key close for accessibility
+  useEffect(() => {
+    if (modalRef.current) {
+      const focusable = modalRef.current.querySelectorAll('button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length > 0) {
+        focusable[0].focus();
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key === 'Tab') {
+        if (!modalRef.current) return;
+        const focusableElements = Array.from(
+          modalRef.current.querySelectorAll(
+            'button, [href], select, textarea, input, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter(el => !el.hasAttribute('disabled') && el.offsetParent !== null);
+        
+        if (focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || !modalRef.current.contains(document.activeElement)) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === lastElement || !modalRef.current.contains(document.activeElement)) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const localities = BANGALORE_LOCALITIES;
 
   const handleAmenityToggle = (amenity) => {
     setSelectedAmenities(prev => ({ ...prev, [amenity]: !prev[amenity] }));
@@ -99,7 +143,7 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
       furnishing: pgFurnishing,
       availableFrom: pgAvailableFrom,
       contactPhone: pgContactPhone,
-      contactEmail: pgContactEmail,
+      contactEmail: '',
       contactWhatsapp: pgContactWhatsapp || pgContactPhone,
       amenities: activeAmenities
     };
@@ -116,7 +160,7 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)' }}>
+      <div className="modal-content" ref={modalRef} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)' }}>
         <button className="modal-close-btn" onClick={onClose} aria-label="Close form">
           <X size={18} />
         </button>
@@ -148,9 +192,10 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'left' }}>
                 {/* Form fields */}
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">PG Accommodation Name *</label>
+                  <label className="form-label" htmlFor="pg-name">PG Accommodation Name *</label>
                   <input 
                     type="text" 
+                    id="pg-name"
                     className="form-input" 
                     placeholder="e.g. Srinidhi Premium Co-living" 
                     value={pgName}
@@ -161,21 +206,28 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Locality Hub *</label>
-                    <select 
+                    <label className="form-label" htmlFor="pg-locality">Locality Hub *</label>
+                    <input 
+                      type="text"
+                      id="pg-locality"
+                      list="list-pg-localities"
                       className="form-input" 
+                      placeholder="e.g. Koramangala"
                       value={pgLocality} 
                       onChange={(e) => setPgLocality(e.target.value)}
-                    >
+                      required
+                    />
+                    <datalist id="list-pg-localities">
                       {localities.map(loc => (
-                        <option key={loc} value={loc}>{loc}</option>
+                        <option key={loc} value={loc} />
                       ))}
-                    </select>
+                    </datalist>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Monthly Rent (INR) *</label>
+                    <label className="form-label" htmlFor="pg-price">Monthly Rent (INR) *</label>
                     <input 
                       type="number" 
+                      id="pg-price"
                       className="form-input" 
                       placeholder="e.g. 9500" 
                       value={pgPrice}
@@ -187,25 +239,26 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Gender Type *</label>
-                    <select className="form-input" value={pgGender} onChange={(e) => setPgGender(e.target.value)}>
+                    <label className="form-label" htmlFor="pg-gender">Gender Type *</label>
+                    <select id="pg-gender" className="form-input" value={pgGender} onChange={(e) => setPgGender(e.target.value)}>
                       <option value="unisex">Coliving</option>
                       <option value="boys">Boys Only</option>
                       <option value="girls">Girls Only</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Furnishing *</label>
-                    <select className="form-input" value={pgFurnishing} onChange={(e) => setPgFurnishing(e.target.value)}>
+                    <label className="form-label" htmlFor="pg-furnishing">Furnishing *</label>
+                    <select id="pg-furnishing" className="form-input" value={pgFurnishing} onChange={(e) => setPgFurnishing(e.target.value)}>
                       <option value="Semi Furnished">Semi Furnished</option>
                       <option value="Fully Furnished">Fully Furnished</option>
                       <option value="Unfurnished">Unfurnished</option>
                     </select>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Available From *</label>
+                    <label className="form-label" htmlFor="pg-available-from">Available From *</label>
                     <input 
                       type="text" 
+                      id="pg-available-from"
                       className="form-input" 
                       placeholder="Immediate / Date" 
                       value={pgAvailableFrom}
@@ -216,9 +269,10 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Full Address *</label>
+                  <label className="form-label" htmlFor="pg-address">Full Address *</label>
                   <input 
                     type="text" 
+                    id="pg-address"
                     className="form-input" 
                     placeholder="House number, Street, Landmark details" 
                     value={pgAddress}
@@ -228,8 +282,9 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                 </div>
 
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Property Description *</label>
+                  <label className="form-label" htmlFor="pg-description">Property Description *</label>
                   <textarea 
+                    id="pg-description"
                     className="form-input" 
                     rows="3" 
                     placeholder="Detail rooms, sharing options, safety, food service hours..."
@@ -243,9 +298,10 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                 {/* Contacts stack */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Owner Mobile *</label>
+                    <label className="form-label" htmlFor="pg-contact-phone">Owner Mobile *</label>
                     <input 
                       type="tel" 
+                      id="pg-contact-phone"
                       className="form-input" 
                       placeholder="10 digit number" 
                       value={pgContactPhone}
@@ -254,9 +310,10 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                     />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">WhatsApp (Optional)</label>
+                    <label className="form-label" htmlFor="pg-contact-whatsapp">WhatsApp (Optional)</label>
                     <input 
                       type="tel" 
+                      id="pg-contact-whatsapp"
                       className="form-input" 
                       placeholder="WhatsApp if different" 
                       value={pgContactWhatsapp}
