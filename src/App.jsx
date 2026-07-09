@@ -635,6 +635,13 @@ export default function App() {
           <div>
             {/* Split Premium Hero Banner */}
             <section className="campaign-hero">
+              {/* Premium Background Animations Container */}
+              <div className="hero-animations-container">
+                <div className="hero-blob blob-1"></div>
+                <div className="hero-blob blob-2"></div>
+                <div className="hero-blob blob-3"></div>
+                <div className="hero-grid-overlay"></div>
+              </div>
               <div className="container" style={{ width: '100%' }}>
                 <div className="hero-split-layout">
                   {/* Left Column: Context, Search */}
