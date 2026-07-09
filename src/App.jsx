@@ -770,40 +770,41 @@ export default function App() {
                           </div>
 
                           <div className="savings-comparison-list">
-                            <div className="comparison-row">
-                              <div className="comparison-info">
-                                <span className="icon-badge negative">✕</span>
-                                <div>
-                                  <span className="comparison-label">Broker Agent route</span>
-                                  <span className="comparison-desc">1 Month Rent Lost forever</span>
+                            <div className="comparison-card route-agent">
+                              <div className="card-badge-status negative">Loss</div>
+                              <div className="comparison-card-body">
+                                <div className="comparison-card-info">
+                                  <span className="comparison-card-label">Traditional Broker Route</span>
+                                  <span className="comparison-card-desc">1 Month Rent lost forever</span>
                                 </div>
+                                <span className="comparison-card-cost negative">₹{rentValue.toLocaleString('en-IN')}</span>
                               </div>
-                              <span className="comparison-cost negative">₹{rentValue.toLocaleString('en-IN')}</span>
                             </div>
 
-                            <div className="comparison-row">
-                              <div className="comparison-info">
-                                <span className="icon-badge positive">✓</span>
-                                <div>
-                                  <span className="comparison-label">PG wala direct route</span>
-                                  <span className="comparison-desc">Unlock contact fee only</span>
+                            <div className="comparison-card route-pgwala">
+                              <div className="card-badge-status positive">Savings</div>
+                              <div className="comparison-card-body">
+                                <div className="comparison-card-info">
+                                  <span className="comparison-card-label">PG wala Direct Route</span>
+                                  <span className="comparison-card-desc">Unlock contact fee only</span>
                                 </div>
+                                <span className="comparison-card-cost positive">₹49</span>
                               </div>
-                              <span className="comparison-cost positive">₹49</span>
                             </div>
                           </div>
                         </div>
 
                         <div className="savings-visualizer-panel">
-                          <div className="liquid-savings-container">
-                            <div className="liquid-orb">
-                              {/* Large Rupee Watermark Symbol */}
-                              <div className="rupee-watermark">₹</div>
-                              
-                              <div className="liquid-content">
-                                <span className="liquid-label">YOU SAVE</span>
-                                <span className="liquid-amount">₹{(rentValue - 49).toLocaleString('en-IN')}</span>
-                                <span className="liquid-percent">{Math.round(((rentValue - 49) / rentValue) * 100)}% Saved</span>
+                          <div className="concentric-dial-container">
+                            <div className="dial-glow-ring secondary"></div>
+                            <div className="dial-glow-ring primary"></div>
+                            <div className="dial-main-ring">
+                              <div className="rupee-icon-watermark">₹</div>
+                              <div className="dial-content">
+                                <span className="dial-label">YOU SAVE</span>
+                                <span className="dial-amount">₹{(rentValue - 49).toLocaleString('en-IN')}</span>
+                                <span className="dial-percent">{Math.round(((rentValue - 49) / rentValue) * 100)}% Saved</span>
+                                <span className="dial-times">{Math.round(rentValue / 49)}x cheaper!</span>
                               </div>
                             </div>
                           </div>
@@ -811,7 +812,7 @@ export default function App() {
                       </div>
 
                       <button 
-                        className="btn btn-primary" 
+                        className="btn btn-primary animate-pulse" 
                         onClick={() => {
                           const gridEl = document.getElementById('catalog-grid');
                           gridEl?.scrollIntoView({ behavior: 'smooth' });

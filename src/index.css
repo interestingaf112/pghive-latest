@@ -2212,7 +2212,7 @@ footer {
   font-weight: 600;
 }
 
-/* Redesigned Liquid Orb Layout */
+/* Redesigned Savings Visualizer Dashboard styles */
 .calc-body {
   display: grid;
   grid-template-columns: 1fr;
@@ -2230,124 +2230,181 @@ footer {
 .calc-control-panel {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
 }
 
 .savings-comparison-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-.comparison-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 14px;
-  background-color: var(--colors-surface-soft);
-  border: 1px solid var(--colors-hairline-soft);
+/* Comparison Cards */
+.comparison-card {
+  position: relative;
   border-radius: var(--rounded-md);
-  transition: transform 0.2s ease, border-color 0.2s ease;
-}
-
-.comparison-row:hover {
-  transform: translateX(4px);
-  border-color: rgba(225, 29, 72, 0.15);
-}
-
-.comparison-info {
+  padding: 14px 16px;
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--colors-surface-soft);
+  border: 1px solid var(--colors-hairline);
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.icon-badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  font-size: 11px;
+.comparison-card.route-agent {
+  border-color: rgba(244, 63, 94, 0.15);
+  background-color: rgba(244, 63, 94, 0.015);
+}
+
+.comparison-card.route-pgwala {
+  border-color: rgba(16, 185, 129, 0.2);
+  background-color: rgba(16, 185, 129, 0.015);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.02);
+}
+
+.comparison-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.comparison-card.route-agent:hover {
+  border-color: rgba(244, 63, 94, 0.3);
+}
+
+.comparison-card.route-pgwala:hover {
+  border-color: rgba(16, 185, 129, 0.4);
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.05);
+}
+
+.card-badge-status {
+  position: absolute;
+  top: -8px;
+  right: 14px;
+  font-family: var(--font-family-display);
+  font-size: 9px;
   font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 2px 8px;
+  border-radius: var(--rounded-full);
 }
 
-.icon-badge.negative {
-  background-color: rgba(239, 68, 68, 0.1);
+.card-badge-status.negative {
+  background-color: rgba(244, 63, 94, 0.1);
   color: var(--colors-accent-red);
 }
 
-.icon-badge.positive {
-  background-color: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
+.card-badge-status.positive {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
 }
 
-.comparison-label {
-  display: block;
-  font-size: 12.5px;
+.comparison-card-body {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.comparison-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.comparison-card-label {
+  font-size: 13px;
   font-weight: 700;
   color: var(--colors-ink);
 }
 
-.comparison-desc {
-  font-size: 10px;
+.comparison-card-desc {
+  font-size: 10.5px;
   color: var(--colors-muted);
   font-weight: 500;
 }
 
-.comparison-cost {
-  font-size: 14px;
+.comparison-card-cost {
+  font-family: var(--font-family-display);
+  font-size: 16px;
   font-weight: 800;
 }
 
-.comparison-cost.negative {
+.comparison-cost.negative, .comparison-card-cost.negative {
   color: var(--colors-accent-red);
 }
 
-.comparison-cost.positive {
-  color: #16a34a;
+.comparison-cost.positive, .comparison-card-cost.positive {
+  color: #10b981;
 }
 
-/* Liquid Savings Orb Visualizer */
+/* Concentric Savings Dial Visualizer */
 .savings-visualizer-panel {
   display: flex;
   justify-content: center;
   align-items: center;
-}
-
-.liquid-savings-container {
-  position: relative;
-  width: 170px;
-  height: 170px;
-}
-
-.liquid-orb {
   width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  border: 3px solid var(--colors-primary);
+}
+
+.concentric-dial-container {
   position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.12) 0%, rgba(225, 29, 72, 0.04) 100%);
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2), 0 8px 24px rgba(225, 29, 72, 0.08);
+  width: 190px;
+  height: 190px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.savings-calc-card:hover .liquid-orb {
-  border-color: var(--colors-primary-active);
-  box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2), 0 12px 32px rgba(225, 29, 72, 0.15);
-  transform: scale(1.02);
-}
-
-.rupee-watermark {
+.dial-glow-ring {
   position: absolute;
-  font-size: 130px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: dial-pulse 3s infinite ease-in-out;
+}
+
+.dial-glow-ring.primary {
+  width: 180px;
+  height: 180px;
+  border: 1px solid rgba(225, 29, 72, 0.08);
+  background: radial-gradient(circle, rgba(225, 29, 72, 0.02) 0%, transparent 70%);
+  animation-delay: 0s;
+}
+
+.dial-glow-ring.secondary {
+  width: 160px;
+  height: 160px;
+  border: 1px solid rgba(225, 29, 72, 0.05);
+  animation-delay: 1.5s;
+}
+
+.dial-main-ring {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  border: 3.5px solid var(--colors-primary);
+  background-color: var(--colors-surface-soft);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.03), 0 8px 32px rgba(225, 29, 72, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.savings-calc-card:hover .dial-main-ring {
+  transform: scale(1.03);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.03), 0 12px 40px rgba(225, 29, 72, 0.12);
+  border-color: var(--colors-primary-active);
+}
+
+.rupee-icon-watermark {
+  position: absolute;
+  font-size: 110px;
   font-weight: 900;
   color: var(--colors-primary);
-  opacity: 0.08;
+  opacity: 0.05;
   z-index: 1;
   pointer-events: none;
   user-select: none;
@@ -2356,15 +2413,10 @@ footer {
   justify-content: center;
   width: 100%;
   height: 100%;
-  transform: translateY(-5px);
+  transform: translateY(-3px);
 }
 
-[data-theme="dark"] .rupee-watermark {
-  color: var(--colors-primary);
-  opacity: 0.05;
-}
-
-.liquid-content {
+.dial-content {
   position: relative;
   z-index: 10;
   display: flex;
@@ -2374,31 +2426,65 @@ footer {
   pointer-events: none;
 }
 
-.liquid-label {
+.dial-label {
   font-family: var(--font-family-display);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 1.5px;
   color: var(--colors-muted);
 }
 
-.liquid-amount {
+.dial-amount {
   font-family: var(--font-family-display);
-  font-size: 26px;
+  font-size: 24px;
   font-weight: 900;
   color: var(--colors-ink);
-  margin: 4px 0;
+  margin: 2px 0;
   letter-spacing: -0.5px;
 }
 
-.liquid-percent {
-  font-size: 10.5px;
+.dial-percent {
+  font-size: 11px;
   font-weight: 800;
-  color: var(--colors-primary);
+  color: #10b981; /* green indicator */
 }
 
-[data-theme="dark"] .liquid-percent {
-  color: var(--colors-primary);
+.dial-times {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--colors-muted);
+  margin-top: 1px;
+}
+
+@keyframes dial-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.3;
+  }
+}
+
+/* Pulsing CTA button keyframes */
+.animate-pulse {
+  animation: btn-pulse-scale 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+@keyframes btn-pulse-scale {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 14px rgba(225, 29, 72, 0.4);
+  }
+  50% {
+    transform: scale(1.015);
+    box-shadow: 0 6px 20px rgba(225, 29, 72, 0.6);
+  }
 }
 
 /* Hubs Section styles */
