@@ -745,68 +745,59 @@ export default function App() {
                         <h3 className="calc-title" style={{ margin: 0 }}>Brokerage Calculator</h3>
                       </div>
                       
-                      <div className="calc-body">
-                        <div className="calc-control-panel">
-                          <div className="calc-slider-group">
-                            <div className="slider-label-row">
-                              <span className="slider-title">Monthly Rent Target</span>
-                              <span className="slider-value">₹{rentValue.toLocaleString('en-IN')}</span>
+                      <div className="calc-body-redesign">
+                        <div className="calc-slider-group">
+                          <div className="slider-label-row">
+                            <span className="slider-title">Monthly Rent Target</span>
+                            <span className="slider-value">₹{rentValue.toLocaleString('en-IN')}</span>
+                          </div>
+                          <input 
+                            type="range" 
+                            min="5000" 
+                            max="30000" 
+                            step="1000" 
+                            value={rentValue} 
+                            onChange={(e) => setRentValue(Number(e.target.value))}
+                            className="calc-range-slider"
+                            style={{ '--slider-progress': `${((rentValue - 5000) / 25000) * 100}%` }}
+                          />
+                          <div className="slider-ticks">
+                            <span>₹5,000</span>
+                            <span>₹15,000</span>
+                            <span>₹30,000</span>
+                          </div>
+                        </div>
+
+                        <div className="comparison-bars-container">
+                          <div className="comparison-bar-item broker-loss">
+                            <div className="bar-label-row">
+                              <span className="bar-name">Broker Agent Fee</span>
+                              <span className="bar-cost">₹{rentValue.toLocaleString('en-IN')}</span>
                             </div>
-                            <input 
-                              type="range" 
-                              min="5000" 
-                              max="30000" 
-                              step="1000" 
-                              value={rentValue} 
-                              onChange={(e) => setRentValue(Number(e.target.value))}
-                              className="calc-range-slider"
-                              style={{ '--slider-progress': `${((rentValue - 5000) / 25000) * 100}%` }}
-                            />
-                            <div className="slider-ticks">
-                              <span>₹5k</span>
-                              <span>₹15k</span>
-                              <span>₹30k</span>
+                            <div className="bar-track">
+                              <div className="bar-fill red-fill" style={{ width: '100%' }}></div>
                             </div>
                           </div>
 
-                          <div className="savings-comparison-list">
-                            <div className="comparison-card route-agent">
-                              <div className="card-badge-status negative">Loss</div>
-                              <div className="comparison-card-body">
-                                <div className="comparison-card-info">
-                                  <span className="comparison-card-label">Traditional Broker Route</span>
-                                  <span className="comparison-card-desc">1 Month Rent lost forever</span>
-                                </div>
-                                <span className="comparison-card-cost negative">₹{rentValue.toLocaleString('en-IN')}</span>
-                              </div>
+                          <div className="comparison-bar-item pgwala-win">
+                            <div className="bar-label-row">
+                              <span className="bar-name">PG wala Fee</span>
+                              <span className="bar-cost">₹49</span>
                             </div>
-
-                            <div className="comparison-card route-pgwala">
-                              <div className="card-badge-status positive">Savings</div>
-                              <div className="comparison-card-body">
-                                <div className="comparison-card-info">
-                                  <span className="comparison-card-label">PG wala Direct Route</span>
-                                  <span className="comparison-card-desc">Unlock contact fee only</span>
-                                </div>
-                                <span className="comparison-card-cost positive">₹49</span>
-                              </div>
+                            <div className="bar-track">
+                              <div className="bar-fill green-fill" style={{ width: `${(49 / rentValue) * 100}%`, minWidth: '4px' }}></div>
                             </div>
                           </div>
                         </div>
 
-                        <div className="savings-visualizer-panel">
-                          <div className="concentric-dial-container">
-                            <div className="dial-glow-ring secondary"></div>
-                            <div className="dial-glow-ring primary"></div>
-                            <div className="dial-main-ring">
-                              <div className="rupee-icon-watermark">₹</div>
-                              <div className="dial-content">
-                                <span className="dial-label">YOU SAVE</span>
-                                <span className="dial-amount">₹{(rentValue - 49).toLocaleString('en-IN')}</span>
-                                <span className="dial-percent">{Math.round(((rentValue - 49) / rentValue) * 100)}% Saved</span>
-                                <span className="dial-times">{Math.round(rentValue / 49)}x cheaper!</span>
-                              </div>
-                            </div>
+                        <div className="savings-summary-banner">
+                          <div className="summary-left">
+                            <span className="summary-title">TOTAL SAVINGS</span>
+                            <span className="summary-amount">₹{(rentValue - 49).toLocaleString('en-IN')}</span>
+                          </div>
+                          <div className="summary-right">
+                            <span className="savings-badge-pill">99.6% Saved</span>
+                            <span className="savings-multiplier">{Math.round(rentValue / 49)}x Cheaper</span>
                           </div>
                         </div>
                       </div>

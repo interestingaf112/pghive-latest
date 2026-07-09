@@ -2212,263 +2212,187 @@ footer {
   font-weight: 600;
 }
 
-/* Redesigned Savings Visualizer Dashboard styles */
-.calc-body {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 28px;
-  margin-top: 24px;
-}
-
-@media (min-width: 768px) {
-  .calc-body {
-    grid-template-columns: 1.25fr 0.75fr;
-    align-items: center;
-  }
-}
-
-.calc-control-panel {
+/* Premium Minimalist Brokerage Calculator styles */
+.calc-body-redesign {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  margin-top: 12px;
 }
 
-.savings-comparison-list {
+/* Custom Range Slider */
+.calc-slider-group {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
-/* Comparison Cards */
-.comparison-card {
-  position: relative;
-  border-radius: var(--rounded-md);
-  padding: 14px 16px;
+.slider-label-row {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background-color: var(--colors-surface-soft);
-  border: 1px solid var(--colors-hairline);
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, box-shadow 0.2s ease;
+  justify-content: space-between;
+  align-items: flex-end;
 }
 
-.comparison-card.route-agent {
-  border-color: rgba(244, 63, 94, 0.15);
-  background-color: rgba(244, 63, 94, 0.015);
+.slider-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--colors-muted);
 }
 
-.comparison-card.route-pgwala {
-  border-color: rgba(16, 185, 129, 0.2);
-  background-color: rgba(16, 185, 129, 0.015);
-  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.02);
-}
-
-.comparison-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-}
-
-.comparison-card.route-agent:hover {
-  border-color: rgba(244, 63, 94, 0.3);
-}
-
-.comparison-card.route-pgwala:hover {
-  border-color: rgba(16, 185, 129, 0.4);
-  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.05);
-}
-
-.card-badge-status {
-  position: absolute;
-  top: -8px;
-  right: 14px;
+.slider-value {
+  color: var(--colors-primary);
   font-family: var(--font-family-display);
-  font-size: 9px;
+  font-size: 20px;
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  padding: 2px 8px;
+}
+
+.calc-range-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
   border-radius: var(--rounded-full);
+  background-color: var(--colors-surface-strong);
+  outline: none;
+  cursor: pointer;
+  background-image: linear-gradient(to right, var(--colors-primary) 0%, var(--colors-primary) var(--slider-progress, 50%), var(--colors-surface-strong) var(--slider-progress, 50%), var(--colors-surface-strong) 100%);
 }
 
-.card-badge-status.negative {
-  background-color: rgba(244, 63, 94, 0.1);
-  color: var(--colors-accent-red);
+.calc-range-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--colors-primary);
+  border: 2px solid var(--colors-canvas);
+  box-shadow: 0 3px 8px rgba(225, 29, 72, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.card-badge-status.positive {
-  background-color: rgba(16, 185, 129, 0.1);
+.calc-range-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.5);
+}
+
+.slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--colors-muted);
+  font-weight: 600;
+}
+
+/* Comparison Bars */
+.comparison-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comparison-bar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bar-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.comparison-bar-item.broker-loss .bar-label-row {
+  color: var(--colors-ink);
+}
+
+.comparison-bar-item.pgwala-win .bar-label-row {
   color: #10b981;
 }
 
-.comparison-card-body {
+.bar-cost {
+  font-family: var(--font-family-display);
+  font-weight: 800;
+}
+
+.bar-track {
+  width: 100%;
+  height: 8px;
+  background-color: var(--colors-surface-strong);
+  border-radius: var(--rounded-full);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: var(--rounded-full);
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bar-fill.red-fill {
+  background-color: var(--colors-accent-red);
+}
+
+.bar-fill.green-fill {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+}
+
+/* Premium Savings Summary Banner */
+.savings-summary-banner {
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.04) 0%, rgba(16, 185, 129, 0.04) 100%);
+  border: 1px solid var(--colors-hairline);
+  border-radius: var(--rounded-md);
+  padding: 16px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
 }
 
-.comparison-card-info {
+.summary-left {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.comparison-card-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--colors-ink);
-}
-
-.comparison-card-desc {
-  font-size: 10.5px;
-  color: var(--colors-muted);
-  font-weight: 500;
-}
-
-.comparison-card-cost {
-  font-family: var(--font-family-display);
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.comparison-cost.negative, .comparison-card-cost.negative {
-  color: var(--colors-accent-red);
-}
-
-.comparison-cost.positive, .comparison-card-cost.positive {
-  color: #10b981;
-}
-
-/* Concentric Savings Dial Visualizer */
-.savings-visualizer-panel {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-}
-
-.concentric-dial-container {
-  position: relative;
-  width: 190px;
-  height: 190px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dial-glow-ring {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  animation: dial-pulse 3s infinite ease-in-out;
-}
-
-.dial-glow-ring.primary {
-  width: 180px;
-  height: 180px;
-  border: 1px solid rgba(225, 29, 72, 0.08);
-  background: radial-gradient(circle, rgba(225, 29, 72, 0.02) 0%, transparent 70%);
-  animation-delay: 0s;
-}
-
-.dial-glow-ring.secondary {
-  width: 160px;
-  height: 160px;
-  border: 1px solid rgba(225, 29, 72, 0.05);
-  animation-delay: 1.5s;
-}
-
-.dial-main-ring {
-  position: relative;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  border: 3.5px solid var(--colors-primary);
-  background-color: var(--colors-surface-soft);
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.03), 0 8px 32px rgba(225, 29, 72, 0.06);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.savings-calc-card:hover .dial-main-ring {
-  transform: scale(1.03);
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.03), 0 12px 40px rgba(225, 29, 72, 0.12);
-  border-color: var(--colors-primary-active);
-}
-
-.rupee-icon-watermark {
-  position: absolute;
-  font-size: 110px;
-  font-weight: 900;
-  color: var(--colors-primary);
-  opacity: 0.05;
-  z-index: 1;
-  pointer-events: none;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  transform: translateY(-3px);
-}
-
-.dial-content {
-  position: relative;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  pointer-events: none;
-}
-
-.dial-label {
-  font-family: var(--font-family-display);
+.summary-title {
   font-size: 10px;
   font-weight: 800;
-  letter-spacing: 1.5px;
+  text-transform: uppercase;
   color: var(--colors-muted);
+  letter-spacing: 0.8px;
 }
 
-.dial-amount {
+.summary-amount {
   font-family: var(--font-family-display);
   font-size: 24px;
   font-weight: 900;
   color: var(--colors-ink);
-  margin: 2px 0;
-  letter-spacing: -0.5px;
 }
 
-.dial-percent {
+.summary-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.savings-badge-pill {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  font-family: var(--font-family-display);
   font-size: 11px;
   font-weight: 800;
-  color: #10b981; /* green indicator */
+  padding: 4px 10px;
+  border-radius: var(--rounded-full);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.dial-times {
-  font-size: 9px;
+.savings-multiplier {
+  font-size: 10.5px;
   font-weight: 700;
   color: var(--colors-muted);
-  margin-top: 1px;
-}
-
-@keyframes dial-pulse {
-  0% {
-    transform: scale(1);
-    opacity: 0.3;
-  }
-  50% {
-    transform: scale(1.08);
-    opacity: 0.7;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 0.3;
-  }
 }
 
 /* Pulsing CTA button keyframes */
