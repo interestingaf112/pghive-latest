@@ -210,33 +210,14 @@ export default function PGDetailsModal({
               {pg.name}
             </h2>
             <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', fontSize: '14px', color: 'var(--colors-muted)' }}>
-              <span className="caption" style={{ color: 'var(--colors-primary)' }}>★ {pg.ratingValue || '4.85'}</span>
-              <span>•</span>
-              <span style={{ textDecoration: 'underline', fontWeight: 500, color: 'var(--colors-ink)' }}>{pg.reviewCount || '84'} reviews</span>
-              <span>•</span>
               <span>{pg.locality}, Bangalore</span>
             </div>
           </div>
 
           {/* Two-Column Grid */}
           <div className="modal-layout-grid">
-            {/* Left Column: Wreath Rating & Disclosures */}
+            {/* Left Column: Disclosures */}
             <div style={{ width: '100%' }}>
-              
-              {/* Laurel Wreath Card */}
-              <div className="rating-display-card">
-                <div className="rating-display-header">
-                  <LaurelWreath />
-                  <span className="rating-display-number">{pg.ratingValue || '4.85'}</span>
-                  <div className="rating-wreath rating-wreath-flipped" style={{ display: 'block', height: '48px', width: '48px' }}>
-                    <LaurelWreath />
-                  </div>
-                </div>
-                <div style={{ fontWeight: 600, fontSize: '16px', marginTop: '12px' }}>Guest favorite</div>
-                <div className="body-sm" style={{ marginTop: '4px', maxWidth: '300px' }}>
-                  One of the most loved PGs on PG wala, based on ratings, reviews, and reliability.
-                </div>
-              </div>
 
               {/* Accordions */}
               <div className="disclosure-container">

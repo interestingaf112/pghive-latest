@@ -188,11 +188,6 @@ export default function PGCard({ pg, onViewDetails, isUnlocked }) {
           <span className="meta-gender">
             {pg.gender === 'unisex' ? 'Coliving' : `${pg.gender}`}
           </span>
-          <span className="meta-divider">·</span>
-          <div className="meta-rating">
-            <Star size={12} fill="currentColor" style={{ marginRight: '2px', color: 'var(--colors-star-rating)' }} />
-            <span>{ratingValue}</span>
-          </div>
         </div>
 
         <div className="pg-card-details-row" style={{ display: 'flex', gap: '6px', fontSize: '12px', color: 'var(--colors-body)', marginTop: '2px', fontWeight: 500 }}>
