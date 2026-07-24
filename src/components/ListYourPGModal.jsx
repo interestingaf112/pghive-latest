@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, UploadCloud, Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
-import { BANGALORE_LOCALITIES } from '../utils/constants';
+import { X, UploadCloud, Loader2, Sparkles, CheckCircle2, RotateCcw } from 'lucide-react';
+import { CITIES, LOCALITY_COORDINATES } from '../utils/constants';
+import LocationPicker from './LocationPicker';
 
 export default function ListYourPGModal({ onClose, onAddPG }) {
   const [pgName, setPgName] = useState('');
-  const [pgLocality, setPgLocality] = useState('SG Palya');
+  const [pgCity, setPgCity] = useState('bangalore');
+  const [pgLocality, setPgLocality] = useState(CITIES.bangalore.localities[0]);
   const [pgAddress, setPgAddress] = useState('');
   const [pgDescription, setPgDescription] = useState('');
   const [pgPrice, setPgPrice] = useState('');
@@ -13,7 +15,16 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
   const [pgAvailableFrom, setPgAvailableFrom] = useState('Immediate');
   const [pgContactPhone, setPgContactPhone] = useState('');
   const [pgContactWhatsapp, setPgContactWhatsapp] = useState('');
+  const [pgCoords, setPgCoords] = useState(null);
   
+  const [pgShowPhone, setPgShowPhone] = useState(true);
+
+  const handleCityChange = (cityKey) => {
+    setPgCity(cityKey);
+    const firstLoc = CITIES[cityKey]?.localities[0] || '';
+    setPgLocality(firstLoc);
+  };
+
   const [selectedAmenities, setSelectedAmenities] = useState({
     wifi: true,
     food: true,
@@ -22,7 +33,8 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
     laundry: false,
     backup: false,
     security: true,
-    parking: false
+    parking: false,
+    lift: false
   });
 
   const [selectedImages, setSelectedImages] = useState([]);
@@ -33,6 +45,39 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  // Reset all form fields to initial values
+  const handleReset = () => {
+    setPgName('');
+    setPgCity('bangalore');
+    setPgLocality(CITIES.bangalore.localities[0]);
+    setPgAddress('');
+    setPgDescription('');
+    setPgPrice('');
+    setPgGender('unisex');
+    setPgFurnishing('Semi Furnished');
+    setPgAvailableFrom('Immediate');
+    setPgContactPhone('');
+    setPgContactWhatsapp('');
+    setPgCoords(null);
+    setPgShowPhone(true);
+    setSelectedAmenities({
+      wifi: true,
+      food: true,
+      ac: false,
+      gym: false,
+      laundry: false,
+      backup: false,
+      security: true,
+      parking: false,
+      lift: false
+    });
+    setSelectedImages([]);
+    imagePreviews.forEach(url => URL.revokeObjectURL(url));
+    setImagePreviews([]);
+    setErrorMsg('');
+  };
 
   // Focus trap & Escape key close for accessibility
   useEffect(() => {
@@ -80,7 +125,7 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const localities = BANGALORE_LOCALITIES;
+
 
   const handleAmenityToggle = (amenity) => {
     setSelectedAmenities(prev => ({ ...prev, [amenity]: !prev[amenity] }));
@@ -130,11 +175,17 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
       return;
     }
 
+    if (!pgCoords) {
+      setErrorMsg('Please pin-drop your exact PG location on the map.');
+      return;
+    }
+
     setIsSubmitting(true);
     const activeAmenities = Object.keys(selectedAmenities).filter(key => selectedAmenities[key]);
 
     const pgData = {
       name: pgName,
+      city: pgCity,
       locality: pgLocality,
       address: pgAddress,
       description: pgDescription,
@@ -142,15 +193,22 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
       gender: pgGender,
       furnishing: pgFurnishing,
       availableFrom: pgAvailableFrom,
+      lat: pgCoords.lat,
+      lng: pgCoords.lng,
       contactPhone: pgContactPhone,
       contactEmail: '',
       contactWhatsapp: pgContactWhatsapp || pgContactPhone,
+      showPhone: pgShowPhone,
       amenities: activeAmenities
     };
 
     try {
       await onAddPG(pgData, selectedImages);
-      setIsSuccess(true);
+      setShowConfetti(true);
+      setTimeout(() => {
+        setIsSuccess(true);
+        setShowConfetti(false);
+      }, 1200);
     } catch (err) {
       setErrorMsg(err.message || 'Failed to submit listing. Please check your network and try again.');
     } finally {
@@ -160,18 +218,43 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 9999 }}>
-      <div className="modal-content" ref={modalRef} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)' }}>
+      <div className="modal-content" ref={modalRef} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', borderRadius: 'var(--rounded-md)', position: 'relative', overflow: 'hidden' }}>
         <button className="modal-close-btn" onClick={onClose} aria-label="Close form">
           <X size={18} />
         </button>
 
+        {/* Confetti animation overlay */}
+        {showConfetti && (
+          <div className="publish-confetti-overlay">
+            {[...Array(30)].map((_, i) => (
+              <div
+                key={i}
+                className="confetti-particle"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 0.6}s`,
+                  animationDuration: `${1 + Math.random() * 1.5}s`,
+                  backgroundColor: ['#4F46E5', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'][i % 6],
+                  width: `${6 + Math.random() * 6}px`,
+                  height: `${6 + Math.random() * 6}px`,
+                  borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                  transform: `rotate(${Math.random() * 360}deg)`
+                }}
+              />
+            ))}
+            <div className="publish-success-pulse">
+              <CheckCircle2 size={64} strokeWidth={2.5} />
+            </div>
+          </div>
+        )}
+
         <div className="modal-body" style={{ padding: '32px', maxHeight: '85vh', overflowY: 'auto' }}>
           {isSuccess ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', textAlign: 'center' }}>
-              <CheckCircle2 size={56} style={{ color: 'var(--colors-accent-blue)', marginBottom: '20px' }} />
-              <h3 className="title-md" style={{ fontSize: '22px', marginBottom: '8px' }}>Property Listed Free!</h3>
+              <CheckCircle2 size={56} style={{ color: '#22C55E', marginBottom: '20px' }} />
+              <h3 className="title-md" style={{ fontSize: '22px', marginBottom: '8px' }}>Property Listed!</h3>
               <p className="body-md" style={{ color: 'var(--colors-body)', marginBottom: '24px', maxWidth: '320px' }}>
-                Your room has been published successfully and is now active in the catalog grid!
+                Your room has been published successfully and is now live in the catalog!
               </p>
               <button className="btn btn-primary" onClick={onClose} style={{ maxWidth: '160px', padding: '8px 24px' }}>
                 Go to Catalog
@@ -204,9 +287,17 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1fr', gap: '12px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" htmlFor="pg-locality">Locality Hub *</label>
+                    <label className="form-label" htmlFor="pg-city">City *</label>
+                    <select id="pg-city" className="form-input" value={pgCity} onChange={(e) => handleCityChange(e.target.value)} style={{ paddingRight: '8px' }}>
+                      {Object.entries(CITIES).map(([key, val]) => (
+                        <option key={key} value={key}>{val.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="pg-locality">Locality *</label>
                     <input 
                       type="text"
                       id="pg-locality"
@@ -218,13 +309,13 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                       required
                     />
                     <datalist id="list-pg-localities">
-                      {localities.map(loc => (
+                      {(CITIES[pgCity]?.localities || []).map(loc => (
                         <option key={loc} value={loc} />
                       ))}
                     </datalist>
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" htmlFor="pg-price">Monthly Rent (INR) *</label>
+                    <label className="form-label" htmlFor="pg-price">Rent (INR) *</label>
                     <input 
                       type="number" 
                       id="pg-price"
@@ -281,6 +372,23 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                   />
                 </div>
 
+                <LocationPicker 
+                  onSelect={(coords) => setPgCoords(coords)} 
+                  defaultCenter={(() => {
+                    const cleaned = pgLocality?.trim().toLowerCase();
+                    if (cleaned) {
+                      const match = Object.keys(LOCALITY_COORDINATES).find(
+                        key => key.toLowerCase() === cleaned
+                      );
+                      if (match) {
+                        return [LOCALITY_COORDINATES[match].lat, LOCALITY_COORDINATES[match].lng];
+                      }
+                    }
+                    return [12.9716, 77.5946];
+                  })()}
+                  value={pgCoords}
+                />
+
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label" htmlFor="pg-description">Property Description *</label>
                   <textarea 
@@ -293,6 +401,22 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                     style={{ resize: 'vertical', minHeight: '80px', padding: '10px 12px' }}
                     required
                   />
+                </div>
+
+                {/* Phone number display option */}
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={pgShowPhone}
+                      onChange={() => setPgShowPhone(!pgShowPhone)}
+                      style={{ accentColor: 'var(--colors-accent-blue)', cursor: 'pointer', width: '16px', height: '16px' }}
+                    />
+                    Display phone number on listing
+                  </label>
+                  <span style={{ fontSize: '11px', color: 'var(--colors-muted)', marginTop: '4px', display: 'block' }}>
+                    When unchecked, users will only see your WhatsApp. Your phone stays private.
+                  </span>
                 </div>
 
                 {/* Contacts stack */}
@@ -334,7 +458,7 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                           onChange={() => handleAmenityToggle(key)} 
                           style={{ accentColor: 'var(--colors-accent-blue)', cursor: 'pointer' }}
                         />
-                        {key === 'backup' ? 'Power' : key}
+                        {key === 'backup' ? 'Power' : key === 'lift' ? 'Lift' : key}
                       </label>
                     ))}
                   </div>
@@ -372,7 +496,7 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                             onClick={() => removeSelectedImage(idx)}
                             style={{ position: 'absolute', top: '2px', right: '2px', backgroundColor: 'rgba(9, 9, 11, 0.75)', color: 'white', border: 'none', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                           >
-                            ✕
+                            x
                           </button>
                         </div>
                       ))}
@@ -380,21 +504,33 @@ export default function ListYourPGModal({ onClose, onAddPG }) {
                   )}
                 </div>
 
-                <button 
-                  type="submit" 
-                  className="btn btn-primary" 
-                  disabled={isSubmitting}
-                  style={{ width: '100%', height: '46px', fontWeight: 700, fontSize: '14px', borderRadius: '4px', marginTop: '12px' }}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="animate-spin" size={16} />
-                      <span>Publishing room listing...</span>
-                    </>
-                  ) : (
-                    <span>Publish Listing Free</span>
-                  )}
-                </button>
+                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={handleReset}
+                    style={{ height: '46px', fontWeight: 600, fontSize: '13px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '6px', padding: '0 16px', flexShrink: 0 }}
+                    title="Reset all fields"
+                  >
+                    <RotateCcw size={14} />
+                    Reset
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary" 
+                    disabled={isSubmitting}
+                    style={{ flex: 1, height: '46px', fontWeight: 700, fontSize: '14px', borderRadius: '4px' }}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="animate-spin" size={16} />
+                        <span>Publishing...</span>
+                      </>
+                    ) : (
+                      <span>Publish Listing Free</span>
+                    )}
+                  </button>
+                </div>
               </form>
             </div>
           )}

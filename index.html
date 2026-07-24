@@ -2,42 +2,42 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Find the best Paying Guest (PG) accommodations in Bangalore with PG wala. Filter by locality, price, amenities, and gender preferences. Zero brokerage — contact owners directly." />
+    <meta name="description" content="Find the best Paying Guest (PG) accommodations in Bangalore with PGhive. Filter by locality, price, amenities, and gender preferences. Zero brokerage — contact owners directly." />
     
     <!-- Security Headers -->
     <meta name="referrer" content="strict-origin-when-cross-origin" />
     
     <!-- Open Graph / Social Sharing -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="PG wala — Premium PG Accommodations in Bangalore" />
+    <meta property="og:title" content="PGhive — Premium PG Accommodations in Bangalore" />
     <meta property="og:description" content="Browse fully-managed PG accommodations and vibrant co-living spaces in Bangalore. Zero brokerage, contact owners directly." />
-    <meta property="og:site_name" content="PG wala" />
+    <meta property="og:site_name" content="PGhive" />
     <meta property="og:locale" content="en_IN" />
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="PG wala — Premium PG Accommodations in Bangalore" />
+    <meta name="twitter:title" content="PGhive — Premium PG Accommodations in Bangalore" />
     <meta name="twitter:description" content="Browse fully-managed PG accommodations and vibrant co-living spaces in Bangalore. Zero brokerage." />
     
     <!-- Additional SEO -->
     <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#18181b" />
-    <link rel="canonical" href="https://pgwala.com" />
+    <link rel="canonical" href="https://pghive-app.vercel.app" />
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <title>PG wala | Premium Paying Guest Accommodations in Bangalore</title>
+    <title>PGhive | Premium Paying Guest Accommodations in Bangalore</title>
   </head>
   <body>
     <noscript>
       <div class="noscript-fallback-wrapper">
         <header class="navbar-noscript">
-          <span class="logo-noscript">pg.wala</span>
+          <span class="logo-noscript">PGhive</span>
         </header>
         <div class="noscript-hero">
           <h1>Zero Brokerage — Contact Owners Directly</h1>
@@ -67,7 +67,7 @@
           </div>
         </div>
         <div class="noscript-footer">
-          &copy; 2026 PG wala. Premium co-living listings in Bangalore.
+          &copy; 2026 PGhive. Premium co-living listings in Bangalore.
         </div>
       </div>
       <style>
@@ -144,117 +144,79 @@
     </noscript>
     
     <div id="root">
-      <!-- Instant Skeleton Loader (prevents blank screen on slow loads) -->
+      <!-- Instant Premium Brand Loader -->
       <style>
-        .initial-skeleton-container {
-          padding: 20px;
-          max-width: 1200px;
-          margin: 0 auto;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        .initial-skeleton-header {
+        .initial-loader-wrapper {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          background-color: #ffffff;
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
           align-items: center;
-          padding: 16px 0;
-          border-bottom: 1px solid #f1f5f9;
+          justify-content: center;
+          font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+          z-index: 99999;
         }
-        .initial-skeleton-logo {
-          font-size: 21px;
-          font-weight: 900;
-          color: #09090b;
+        .initial-loader-logo {
+          font-size: 40px;
+          letter-spacing: -1px;
+          line-height: 1;
+          display: flex;
+          align-items: center;
+          margin-bottom: 24px;
+          user-select: none;
         }
-        .initial-skeleton-pulse {
-          background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-          background-size: 200% 100%;
-          animation: initial-shimmer 1.5s infinite linear;
-          border-radius: 6px;
+        .initial-loader-logo .pg {
+          font-weight: 800;
+          color: #111111;
         }
-        .initial-skeleton-btn {
-          width: 80px;
-          height: 32px;
+        .initial-loader-logo .hive {
+          font-weight: 800;
+          color: #0035ad;
         }
-        .initial-skeleton-hero {
-          margin-top: 48px;
-          max-width: 600px;
-        }
-        .initial-skeleton-title {
+        .initial-loader-spinner-container {
+          position: relative;
+          width: 48px;
           height: 48px;
-          width: 80%;
-          margin-bottom: 16px;
         }
-        .initial-skeleton-text {
-          height: 18px;
+        .initial-loader-circle {
+          box-sizing: border-box;
           width: 100%;
-          margin-bottom: 8px;
+          height: 100%;
+          border: 3.5px solid rgba(0, 53, 173, 0.08);
+          border-radius: 50%;
+          border-top-color: #0035ad;
+          animation: initial-spin 0.8s cubic-bezier(0.6, 0.2, 0.1, 1) infinite;
         }
-        .initial-skeleton-search {
-          height: 56px;
+        .initial-loader-pulse {
+          position: absolute;
+          top: 0;
+          left: 0;
           width: 100%;
-          margin-top: 32px;
+          height: 100%;
+          border: 3.5px solid #0035ad;
+          border-radius: 50%;
+          opacity: 0;
+          animation: initial-pulse-scale 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
         }
-        .initial-skeleton-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 24px;
-          margin-top: 64px;
+        @keyframes initial-spin {
+          to { transform: rotate(360deg); }
         }
-        .initial-skeleton-card {
-          border: 1px solid #f1f5f9;
-          border-radius: 8px;
-          padding: 12px;
-        }
-        .initial-skeleton-img {
-          height: 200px;
-          width: 100%;
-          border-radius: 6px;
-          margin-bottom: 12px;
-        }
-        .initial-skeleton-meta {
-          height: 16px;
-          width: 50%;
-          margin-bottom: 8px;
-        }
-        .initial-skeleton-name {
-          height: 20px;
-          width: 90%;
-        }
-        @keyframes initial-shimmer {
-          0% {
-            background-position: -200% 0;
-          }
-          100% {
-            background-position: 200% 0;
-          }
+        @keyframes initial-pulse-scale {
+          0% { transform: scale(0.8); opacity: 0.5; }
+          100% { transform: scale(1.6); opacity: 0; }
         }
       </style>
-      <div class="initial-skeleton-container">
-        <div class="initial-skeleton-header">
-          <div class="initial-skeleton-logo">pg.wala</div>
-          <div class="initial-skeleton-pulse initial-skeleton-btn"></div>
+      <div class="initial-loader-wrapper">
+        <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 24px;">
+          <img src="/logo-cropped.png" alt="PGhive Logo" style="height: 64px; display: block;" />
         </div>
-        <div class="initial-skeleton-hero">
-          <div class="initial-skeleton-pulse initial-skeleton-title"></div>
-          <div class="initial-skeleton-pulse initial-skeleton-text"></div>
-          <div class="initial-skeleton-pulse initial-skeleton-text" style="width: 60%"></div>
-          <div class="initial-skeleton-pulse initial-skeleton-search"></div>
-        </div>
-        <div class="initial-skeleton-grid">
-          <div class="initial-skeleton-card">
-            <div class="initial-skeleton-pulse initial-skeleton-img"></div>
-            <div class="initial-skeleton-pulse initial-skeleton-meta"></div>
-            <div class="initial-skeleton-pulse initial-skeleton-name"></div>
-          </div>
-          <div class="initial-skeleton-card">
-            <div class="initial-skeleton-pulse initial-skeleton-img"></div>
-            <div class="initial-skeleton-pulse initial-skeleton-meta"></div>
-            <div class="initial-skeleton-pulse initial-skeleton-name"></div>
-          </div>
-          <div class="initial-skeleton-card">
-            <div class="initial-skeleton-pulse initial-skeleton-img"></div>
-            <div class="initial-skeleton-pulse initial-skeleton-meta"></div>
-            <div class="initial-skeleton-pulse initial-skeleton-name"></div>
-          </div>
+        <div class="initial-loader-spinner-container">
+          <div class="initial-loader-circle"></div>
+          <div class="initial-loader-pulse"></div>
         </div>
       </div>
     </div>

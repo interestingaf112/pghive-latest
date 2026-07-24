@@ -15,6 +15,10 @@ export default defineConfig({
     sourcemap: false,
     // Split Firebase SDK into a separate chunk (lazy-loaded)
     rollupOptions: {
+      input: {
+        main: path.resolve(process.cwd(), 'index.html'),
+        admin: path.resolve(process.cwd(), 'admin.html')
+      },
       output: {
         manualChunks(id) {
           if (id.includes('firebase/app')) {

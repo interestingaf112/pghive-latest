@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { Menu, X } from 'lucide-react';
 import './VisionNav.css';
 
 const VisionNav = ({
-  logoText = 'pg.wala',
+  logoText = 'PGhive',
   onLogoClick,
   items = []
 }) => {
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navRef = useRef(null);
 
   // Entrance animation
@@ -18,10 +21,30 @@ const VisionNav = ({
 
   // Shrink slightly on scroll
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 30);
+    let currentScrolled = false;
+    const handleScroll = () => {
+      const isOver = window.scrollY > 30;
+      if (isOver !== currentScrolled) {
+        currentScrolled = isOver;
+        setScrolled(isOver);
+      }
+    };
     window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Prevent background scroll when mobile drawer is active
+  useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isMobileMenuOpen]);
 
   return (
     <header className={`vision-nav-wrap ${mounted ? 'mounted' : ''}`} aria-label="Main navigation">
@@ -34,7 +57,7 @@ const VisionNav = ({
         <button
           className="vision-nav-logo"
           onClick={onLogoClick}
-          aria-label="pg.wala — home"
+          aria-label="PGhive — home"
           role="menuitem"
         >
           {logoText}
@@ -43,7 +66,7 @@ const VisionNav = ({
         {/* Divider */}
         <div className="vision-nav-sep" aria-hidden="true" />
 
-        {/* Nav Items */}
+        {/* Desktop Nav Items */}
         <div className="vision-nav-items">
           {items.map((item, i) => (
             <button
@@ -62,7 +85,55 @@ const VisionNav = ({
             </button>
           ))}
         </div>
+
+        {/* Mobile Hamburger Trigger */}
+        <button
+          className="mobile-menu-trigger"
+          onClick={() => setIsMobileMenuOpen(true)}
+          aria-label="Open navigation menu"
+        >
+          <Menu size={20} />
+        </button>
       </nav>
+
+      {/* Mobile Slide-Out Sidebar Drawer */}
+      {isMobileMenuOpen && createPortal(
+        <div className="mobile-sidebar-backdrop" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="mobile-sidebar-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="mobile-sidebar-header">
+              <span className="mobile-sidebar-title">Menu</span>
+              <button 
+                className="mobile-sidebar-close" 
+                onClick={() => setIsMobileMenuOpen(false)}
+                aria-label="Close navigation menu"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="mobile-sidebar-items">
+              {items.map((item, i) => (
+                <button
+                  key={`mob-vn-${i}`}
+                  className="mobile-sidebar-item"
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    item.onClick();
+                  }}
+                  aria-label={item.label}
+                >
+                  {item.icon && (
+                    <span className="mobile-sidebar-item-icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                  )}
+                  <span className="mobile-sidebar-item-label">{item.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </header>
   );
 };

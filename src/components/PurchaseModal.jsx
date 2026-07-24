@@ -3,7 +3,7 @@ import { X, CreditCard, ShieldCheck, Loader2, CheckCircle2, AlertCircle } from '
 import gsap from 'gsap';
 import { isFirebaseActive, getFirebaseIdToken } from '../firebase';
 
-export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser }) {
+export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser, onOpenAuth }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [successPack, setSuccessPack] = useState(null);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -134,8 +134,15 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser 
         });
 
         if (!orderRes.ok) {
-          const errData = await orderRes.json().catch(() => ({}));
-          throw new Error(errData.error || 'Failed to create payment order.');
+          let errorText = `Server Error (${orderRes.status})`;
+          try {
+            const errData = await orderRes.json();
+            if (errData && errData.error) errorText = errData.error;
+          } catch {
+            const rawText = await orderRes.text().catch(() => '');
+            if (rawText) errorText = `Server Error (${orderRes.status}): ${rawText.substring(0, 100)}`;
+          }
+          throw new Error(errorText);
         }
 
         const orderData = await orderRes.json();
@@ -148,7 +155,7 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser 
           amount: orderData.amount,
           currency: orderData.currency,
           order_id: orderData.orderId,
-          name: 'PG wala',
+          name: 'PGhive',
           description: `${pack.title} — ${pack.credits} Credits`,
           theme: { color: '#000000' },
           prefill: {
@@ -214,12 +221,12 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser 
       key: razorpayKey,
       amount: pack.price * 100,
       currency: 'INR',
-      name: 'PG wala',
+      name: 'PGhive',
       description: `${pack.title} — ${pack.credits} Credits`,
       theme: { color: '#000000' },
       prefill: {
         name: currentUser?.displayName || 'PG Tenant User',
-        email: currentUser?.email || 'tenant.pgwala@example.com',
+        email: currentUser?.email || 'tenant.pghive@example.com',
         contact: currentUser?.phoneNumber || '9999999999'
       },
       handler: function (response) {
@@ -273,19 +280,37 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser 
               color: 'var(--colors-ink)'
             }}>
               <AlertCircle size={18} style={{ color: '#dc2626', flexShrink: 0, marginTop: '2px' }} />
-              <div>
+              <div style={{ width: '100%' }}>
                 <p className="body-sm" style={{ margin: 0, lineHeight: 1.5 }}>{errorMessage}</p>
-                <button 
-                  className="body-sm" 
-                  onClick={() => setErrorMessage(null)}
-                  style={{ 
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: '#dc2626', fontWeight: 600, padding: 0, marginTop: '6px',
-                    textDecoration: 'underline'
-                  }}
-                >
-                  Dismiss
-                </button>
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '6px' }}>
+                  {errorMessage.toLowerCase().includes('sign in') && onOpenAuth && (
+                    <button 
+                      className="body-sm" 
+                      onClick={() => {
+                        onClose();
+                        onOpenAuth();
+                      }}
+                      style={{ 
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: 'var(--colors-primary)', fontWeight: 700, padding: 0,
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Sign In / Register
+                    </button>
+                  )}
+                  <button 
+                    className="body-sm" 
+                    onClick={() => setErrorMessage(null)}
+                    style={{ 
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#dc2626', fontWeight: 600, padding: 0,
+                      textDecoration: 'underline'
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                </div>
               </div>
             </div>
           )}

@@ -53,7 +53,7 @@ export default function TermsModal({ onClose }) {
   const sections = [
     {
       title: "1. Service Overview",
-      content: "PG wala operates as a peer-to-peer directory listing for paying guest (PG) accommodations in Bangalore. We are not a real estate agency and do not broker property deals, verify tenancies, or collect brokerage fees. All negotiations happen directly between owners and residents."
+      content: "PGhive operates as a peer-to-peer directory listing for paying guest (PG) accommodations in Bangalore. We are not a real estate agency and do not broker property deals, verify tenancies, or collect brokerage fees. All negotiations happen directly between owners and residents."
     },
     {
       title: "2. Contact Credit purchases",
@@ -65,7 +65,7 @@ export default function TermsModal({ onClose }) {
     },
     {
       title: "4. Limitation of Liability",
-      content: "PG wala does not guarantee the accuracy of listing descriptions, photos, or owner identities. We advise all users to perform physical property inspections and verification of lease papers before transferring security deposits."
+      content: "PGhive does not guarantee the accuracy of listing descriptions, photos, or owner identities. We advise all users to perform physical property inspections and verification of lease papers before transferring security deposits."
     }
   ];
 

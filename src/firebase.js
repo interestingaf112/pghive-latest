@@ -1,6 +1,11 @@
 import { savePhoto, getPhoto, deletePhoto } from './utils/db';
 import { sanitizeText, validatePhone, validateEmail, validatePrice, validateFile } from './utils/sanitize';
 import bcrypt from 'bcryptjs';
+import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
+import { initializeAppCheck, ReCaptchaV3Provider, getToken } from 'firebase/app-check';
 
 // Try to load Firebase environment variables if present
 const firebaseConfig = {
@@ -25,17 +30,11 @@ let db = null;
 let auth = null;
 let storage = null;
 let firebaseApp = null;
+let appCheck = null;
 
-// Initialize Firebase dynamically if keys are present
+// Initialize Firebase synchronously if keys are present
 if (isFirebaseConfigured) {
   try {
-    // Dynamic import to prevent app crash if Firebase fails to load
-    const { initializeApp } = await import('firebase/app');
-    const { getFirestore } = await import('firebase/firestore');
-    const { getAuth } = await import('firebase/auth');
-    const { getStorage } = await import('firebase/storage');
-    const { initializeAppCheck, ReCaptchaDebugProvider } = await import('firebase/app-check');
-    
     // Enable local App Check debug tokens ONLY in local development contexts to prevent token leaks in production
     const isLocalDev = typeof window !== 'undefined' && 
       (window.location.hostname === 'localhost' || 
@@ -57,11 +56,8 @@ if (isFirebaseConfigured) {
       const hasRealSiteKey = recaptchaSiteKey && recaptchaSiteKey !== '6Ad-dummy-recaptcha-key-here-for-safety';
       
       if (isLocalDev || hasRealSiteKey) {
-        const { ReCaptchaV3Provider } = await import('firebase/app-check');
-        initializeAppCheck(firebaseApp, {
-          provider: isLocalDev 
-            ? new ReCaptchaDebugProvider() 
-            : new ReCaptchaV3Provider(recaptchaSiteKey),
+        appCheck = initializeAppCheck(firebaseApp, {
+          provider: new ReCaptchaV3Provider(recaptchaSiteKey || '6Ad-dummy-recaptcha-key-here-for-safety'),
           isTokenAutoRefreshEnabled: true
         });
         console.log(`Firebase App Check initialized successfully (${isLocalDev ? 'Debug' : 'ReCaptchaV3'} Provider active).`);
@@ -82,6 +78,10 @@ if (isFirebaseConfigured) {
 
 export const isFirebaseActive = !!(db && auth);
 
+export function isFirebaseOperational() {
+  return !!(isFirebaseActive && auth?.currentUser);
+}
+
 /**
  * Get a Firebase ID token for the current authenticated user.
  * Used to authenticate requests to server-side API routes (e.g., /api/verify-payment).
@@ -100,7 +100,7 @@ export async function getFirebaseIdToken() {
 const TEST_ACCOUNTS = [
   'abhinandsreejith12@gmail.com',
   'amanmohdp53@gmail.com',
-  'admin@pgwala.com',
+  'admin@pghive.com',
   'abhinandshopify@gmail.com'
 ];
 
@@ -118,10 +118,10 @@ export function checkIfTestEmail(email) {
 // True credit security is enforced server-side via Firestore rules + Admin SDK.
 
 const CREDIT_SECRET = (() => {
-  let deviceSecret = localStorage.getItem('pg_wala_device_secret');
+  let deviceSecret = localStorage.getItem('pg_hub_device_secret');
   if (!deviceSecret) {
     deviceSecret = 'dev-' + crypto.randomUUID();
-    localStorage.setItem('pg_wala_device_secret', deviceSecret);
+    localStorage.setItem('pg_hub_device_secret', deviceSecret);
   }
   return deviceSecret;
 })();
@@ -180,7 +180,7 @@ async function saveSignedAttempts(key, attempts) {
 export async function checkLoginRateLimit() {
   const now = Date.now();
   const windowMs = 15 * 60 * 1000;
-  const key = 'pg_wala_login_attempts_signed';
+  const key = 'pg_hub_login_attempts_signed';
   const attempts = (await getSignedAttempts(key)).filter(timestamp => now - timestamp < windowMs);
   
   await saveSignedAttempts(key, attempts);
@@ -199,7 +199,7 @@ export async function checkLoginRateLimit() {
 
 export async function registerFailedLoginAttempt() {
   const now = Date.now();
-  const key = 'pg_wala_login_attempts_signed';
+  const key = 'pg_hub_login_attempts_signed';
   const attempts = await getSignedAttempts(key);
   attempts.push(now);
   await saveSignedAttempts(key, attempts);
@@ -207,7 +207,7 @@ export async function registerFailedLoginAttempt() {
 
 export async function clearLoginAttempts() {
   try {
-    localStorage.removeItem('pg_wala_login_attempts_signed');
+    localStorage.removeItem('pg_hub_login_attempts_signed');
   } catch (e) {
     console.error("Failed to clear login attempts:", e);
   }
@@ -221,7 +221,7 @@ export async function clearLoginAttempts() {
 
 async function getAccountLockState(email) {
   try {
-    const key = `pg_wala_lock_${email.replace(/[^a-zA-Z0-9]/g, '_')}_signed`;
+    const key = `pg_hub_lock_${email.replace(/[^a-zA-Z0-9]/g, '_')}_signed`;
     const stored = localStorage.getItem(key);
     if (!stored) return { failedAttempts: 0, lockedUntil: 0 };
     const { value, sig } = JSON.parse(stored);
@@ -237,7 +237,7 @@ async function getAccountLockState(email) {
 
 async function saveAccountLockState(email, state) {
   try {
-    const key = `pg_wala_lock_${email.replace(/[^a-zA-Z0-9]/g, '_')}_signed`;
+    const key = `pg_hub_lock_${email.replace(/[^a-zA-Z0-9]/g, '_')}_signed`;
     const valueStr = JSON.stringify(state);
     const sig = await hmacSign(valueStr);
     localStorage.setItem(key, JSON.stringify({ value: state, sig }));
@@ -269,7 +269,7 @@ async function recordFailedLogin(email) {
 }
 
 async function clearFailedLogin(email) {
-  const key = `pg_wala_lock_${email.replace(/[^a-zA-Z0-9]/g, '_')}_signed`;
+  const key = `pg_hub_lock_${email.replace(/[^a-zA-Z0-9]/g, '_')}_signed`;
   localStorage.removeItem(key);
 }
 
@@ -294,7 +294,7 @@ async function getDeviceFingerprint() {
 // General Endpoint Rate Limiter
 async function checkGeneralRateLimit(actionName, maxAttempts, timeWindowMs) {
   try {
-    const key = `pg_wala_rate_${actionName}_signed`;
+    const key = `pg_hub_rate_${actionName}_signed`;
     const now = Date.now();
     let attempts = await getSignedAttempts(key);
     
@@ -322,15 +322,14 @@ async function checkGeneralRateLimit(actionName, maxAttempts, timeWindowMs) {
 // CREDIT SYSTEM (Service Layer)
 // ==========================================
 
-const DEFAULT_CREDITS = 3;
+const DEFAULT_CREDITS = 1;
 
 export async function getUserCredits() {
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc } = await import('firebase/firestore');
       const user = auth.currentUser;
-      // For unauthenticated users, use anonymous session ID
-      const userId = user?.uid || getAnonymousUserId();
+      const userId = user.uid;
       const userDoc = await getDoc(doc(db, 'users', userId));
       
       const isTestEmail = user?.email && checkIfTestEmail(user.email);
@@ -357,7 +356,7 @@ export async function getUserCredits() {
   // Local Mode — HMAC-signed credits (user-specific keys to prevent credit bleed)
   const user = getLocalSessionUser();
   const emailKey = user ? `_${user.email}` : '';
-  const stored = localStorage.getItem(`pg_wala_credits_signed${emailKey}`);
+  const stored = localStorage.getItem(`pg_hub_credits_signed${emailKey}`);
   if (stored) {
     try {
       const { value, sig } = JSON.parse(stored);
@@ -378,16 +377,16 @@ async function setLocalCredits(amount) {
   const user = getLocalSessionUser();
   const emailKey = user ? `_${user.email}` : '';
   const sig = await hmacSign(amount);
-  localStorage.setItem(`pg_wala_credits_signed${emailKey}`, JSON.stringify({ value: amount, sig }));
+  localStorage.setItem(`pg_hub_credits_signed${emailKey}`, JSON.stringify({ value: amount, sig }));
   // Remove old unsigned keys if they exist
-  localStorage.removeItem(`pg_wala_credits${emailKey}`);
+  localStorage.removeItem(`pg_hub_credits${emailKey}`);
 }
 
 export async function getUnlockedPGIds() {
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc } = await import('firebase/firestore');
-      const userId = auth.currentUser?.uid || getAnonymousUserId();
+      const userId = auth.currentUser.uid;
       const userDoc = await getDoc(doc(db, 'users', userId));
       if (userDoc.exists()) {
         return userDoc.data().unlockedPGs || [];
@@ -401,15 +400,15 @@ export async function getUnlockedPGIds() {
   // Local Mode (user-specific unlocked lists)
   const user = getLocalSessionUser();
   const emailKey = user ? `_${user.email}` : '';
-  const stored = localStorage.getItem(`pg_wala_unlocked_ids${emailKey}`);
+  const stored = localStorage.getItem(`pg_hub_unlocked_ids${emailKey}`);
   return stored ? JSON.parse(stored) : [];
 }
 
 function getAnonymousUserId() {
-  let anonId = localStorage.getItem('pg_wala_anon_uid');
+  let anonId = localStorage.getItem('pg_hub_anon_uid');
   if (!anonId) {
     anonId = 'anon-' + crypto.randomUUID();
-    localStorage.setItem('pg_wala_anon_uid', anonId);
+    localStorage.setItem('pg_hub_anon_uid', anonId);
   }
   return anonId;
 }
@@ -479,10 +478,10 @@ export async function unlockPGContact(pgId) {
 
   const currentFingerprint = await getDeviceFingerprint();
 
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc, updateDoc, arrayUnion } = await import('firebase/firestore');
-      const userId = auth.currentUser?.uid || getAnonymousUserId();
+      const userId = auth.currentUser.uid;
       
       // Email verification gate (prevent throwaway accounts)
       const currentUser = auth.currentUser;
@@ -491,10 +490,7 @@ export async function unlockPGContact(pgId) {
         throw new Error("Email verification required. Please check your inbox and verify your email to unlock listing contacts.");
       }
 
-      // Invisible reCAPTCHA / App Check token check on unlock
       try {
-        const { getAppCheck, getToken } = await import('firebase/app-check');
-        const appCheck = getAppCheck(firebaseApp);
         if (appCheck) {
           await getToken(appCheck, false);
         }
@@ -507,8 +503,14 @@ export async function unlockPGContact(pgId) {
       }
       
       // Check if already unlocked
-      const userDoc = await getDoc(doc(db, 'users', userId));
-      const userData = userDoc.exists() ? userDoc.data() : { credits: DEFAULT_CREDITS, unlockedPGs: [], fingerprints: [] };
+      let userDoc = await getDoc(doc(db, 'users', userId));
+      if (!userDoc.exists()) {
+        const { setDoc } = await import('firebase/firestore');
+        const initialCredits = isTestEmail ? 10 : DEFAULT_CREDITS;
+        await setDoc(doc(db, 'users', userId), { credits: initialCredits, unlockedPGs: [] });
+        userDoc = await getDoc(doc(db, 'users', userId));
+      }
+      const userData = userDoc.data();
       
       // Check fingerprint history for suspicious new device pattern
       const fingerprints = userData.fingerprints || [];
@@ -536,9 +538,14 @@ export async function unlockPGContact(pgId) {
       }
       
       // Deduct credit and mark as unlocked with usage log
+      const pgDoc = await getDoc(doc(db, 'pgs', pgId));
+      const pgName = pgDoc.exists() ? pgDoc.data().name : 'Unknown PG';
+
+      const usageId = 'use_' + Math.random().toString(36).slice(2, 11);
       const usageEntry = {
-        id: 'use_' + Math.random().toString(36).slice(2, 11),
+        id: usageId,
         pgId,
+        pgName,
         creditsSpent: 1,
         timestamp: Date.now(),
         description: 'Unlocked PG contact details',
@@ -552,6 +559,18 @@ export async function unlockPGContact(pgId) {
         unlockedPGs: arrayUnion(pgId),
         usageLog: arrayUnion(usageEntry)
       });
+
+      // Write centralized unlock record
+      const { setDoc } = await import('firebase/firestore');
+      await setDoc(doc(db, 'unlocks', usageId), {
+        unlockId: usageId,
+        userId: userId,
+        userEmail: currentUser.email || 'anonymous@pghive.co.in',
+        pgId,
+        pgName,
+        creditsSpent: 1,
+        timestamp: Date.now()
+      });
       
       // Return private contacts
       const contactDoc = await getDoc(doc(db, 'pgs', pgId, 'private', 'contacts'));
@@ -561,7 +580,7 @@ export async function unlockPGContact(pgId) {
       if (pgId.startsWith('mock-') && MOCK_PRIVATE_CONTACTS[pgId]) {
         return MOCK_PRIVATE_CONTACTS[pgId];
       }
-      return { phone: '+91 99999 99999', email: 'owner@pgwala.com', whatsapp: '+91 99999 99999' };
+      return { phone: '+91 99999 99999', email: 'owner@pghive.com', whatsapp: '+91 99999 99999' };
     } catch (error) {
       console.error("Error unlocking PG contact:", error);
       throw error;
@@ -579,8 +598,8 @@ export async function unlockPGContact(pgId) {
   }
 
   // Local Mode Fingerprint tracking
-  const localUsers = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
-  const userEmail = user?.email || 'guest.pgwala@example.com';
+  const localUsers = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
+  const userEmail = user?.email || 'guest.pghive@example.com';
   const uIdx = localUsers.findIndex(u => u.email === userEmail);
   if (uIdx !== -1) {
     const localUser = localUsers[uIdx];
@@ -590,11 +609,11 @@ export async function unlockPGContact(pgId) {
       localUser.fingerprints = [...fingerprints, currentFingerprint];
       localUser.suspiciousFlags = [...(localUser.suspiciousFlags || []), { timestamp: Date.now(), reason: 'New device unlock request' }];
       localUsers[uIdx] = localUser;
-      localStorage.setItem('pg_wala_mock_users', JSON.stringify(localUsers));
+      localStorage.setItem('pg_hub_mock_users', JSON.stringify(localUsers));
     } else if (!fingerprints.includes(currentFingerprint)) {
       localUser.fingerprints = [...fingerprints, currentFingerprint];
       localUsers[uIdx] = localUser;
-      localStorage.setItem('pg_wala_mock_users', JSON.stringify(localUsers));
+      localStorage.setItem('pg_hub_mock_users', JSON.stringify(localUsers));
     }
   }
 
@@ -605,7 +624,7 @@ export async function unlockPGContact(pgId) {
     if (pgId.startsWith('mock-') && MOCK_PRIVATE_CONTACTS[pgId]) {
       return MOCK_PRIVATE_CONTACTS[pgId];
     }
-    return { phone: '+91 99999 99999', email: 'owner@pgwala.com', whatsapp: '+91 99999 99999' };
+    return { phone: '+91 99999 99999', email: 'owner@pghive.com', whatsapp: '+91 99999 99999' };
   }
   
   if (credits <= 0) {
@@ -618,7 +637,7 @@ export async function unlockPGContact(pgId) {
   // Mark as unlocked
   unlocked.push(pgId);
   const emailKey = user ? `_${user.email}` : '';
-  localStorage.setItem(`pg_wala_unlocked_ids${emailKey}`, JSON.stringify(unlocked));
+  localStorage.setItem(`pg_hub_unlocked_ids${emailKey}`, JSON.stringify(unlocked));
 
   // Record usage log locally
   const usageEntry = {
@@ -631,7 +650,7 @@ export async function unlockPGContact(pgId) {
     ipHash: 'hash-' + currentFingerprint.substring(0, 10),
     paymentRef: 'ref_local_credit'
   };
-  const logsKey = `pg_wala_usage_log_${userEmail}`;
+  const logsKey = `pg_hub_usage_log_${userEmail}`;
   const existingLogs = JSON.parse(localStorage.getItem(logsKey) || '[]');
   existingLogs.push(usageEntry);
   localStorage.setItem(logsKey, JSON.stringify(existingLogs));
@@ -642,7 +661,7 @@ export async function unlockPGContact(pgId) {
   if (pgId.startsWith('mock-') && MOCK_PRIVATE_CONTACTS[pgId]) {
     return MOCK_PRIVATE_CONTACTS[pgId];
   }
-  return { phone: '+91 99999 99999', email: 'owner@pgwala.com', whatsapp: '+91 99999 99999' };
+  return { phone: '+91 99999 99999', email: 'owner@pghive.com', whatsapp: '+91 99999 99999' };
 }
 
 /**
@@ -689,8 +708,8 @@ export async function addCredits(amount) {
     status: 'Local Mode'
   };
   const user = getLocalSessionUser();
-  const userEmail = user?.email || 'guest.pgwala@example.com';
-  const paymentsKey = `pg_wala_payments_${userEmail}`;
+  const userEmail = user?.email || 'guest.pghive@example.com';
+  const paymentsKey = `pg_hub_payments_${userEmail}`;
   const existingPayments = JSON.parse(localStorage.getItem(paymentsKey) || '[]');
   existingPayments.push(paymentEntry);
   localStorage.setItem(paymentsKey, JSON.stringify(existingPayments));
@@ -705,11 +724,10 @@ function getLocalSessionUser() {
 }
 
 export async function getUserPayments() {
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc } = await import('firebase/firestore');
-      const userId = auth.currentUser?.uid;
-      if (!userId) return [];
+      const userId = auth.currentUser.uid;
       const userDoc = await getDoc(doc(db, 'users', userId));
       return userDoc.exists() ? userDoc.data().payments || [] : [];
     } catch {
@@ -717,17 +735,16 @@ export async function getUserPayments() {
     }
   }
   const user = getLocalSessionUser();
-  const userEmail = user?.email || 'guest.pgwala@example.com';
-  const paymentsKey = `pg_wala_payments_${userEmail}`;
+  const userEmail = user?.email || 'guest.pghive@example.com';
+  const paymentsKey = `pg_hub_payments_${userEmail}`;
   return JSON.parse(localStorage.getItem(paymentsKey) || '[]');
 }
 
 export async function getUserUsageLog() {
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc } = await import('firebase/firestore');
-      const userId = auth.currentUser?.uid;
-      if (!userId) return [];
+      const userId = auth.currentUser.uid;
       const userDoc = await getDoc(doc(db, 'users', userId));
       return userDoc.exists() ? userDoc.data().usageLog || [] : [];
     } catch {
@@ -735,16 +752,60 @@ export async function getUserUsageLog() {
     }
   }
   const user = getLocalSessionUser();
-  const userEmail = user?.email || 'guest.pgwala@example.com';
-  const logsKey = `pg_wala_usage_log_${userEmail}`;
+  const userEmail = user?.email || 'guest.pghive@example.com';
+  const logsKey = `pg_hub_usage_log_${userEmail}`;
   return JSON.parse(localStorage.getItem(logsKey) || '[]');
+}
+
+export async function fetchAdminUnlockLogs() {
+  if (isFirebaseActive) {
+    try {
+      const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
+      const q = query(collection(db, 'unlocks'), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const logs = [];
+      querySnapshot.forEach((doc) => {
+        logs.push(doc.data());
+      });
+      return logs;
+    } catch (err) {
+      console.error("Error fetching admin unlock logs:", err);
+      return [];
+    }
+  }
+  const user = getLocalSessionUser();
+  const userEmail = user?.email || 'guest.pghive@example.com';
+  const logsKey = `pg_hub_usage_log_${userEmail}`;
+  return JSON.parse(localStorage.getItem(logsKey) || '[]');
+}
+
+export async function fetchAdminPurchaseLogs() {
+  if (isFirebaseActive) {
+    try {
+      const { collection, getDocs, query, orderBy } = await import('firebase/firestore');
+      const q = query(collection(db, 'purchases'), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const logs = [];
+      querySnapshot.forEach((doc) => {
+        logs.push(doc.data());
+      });
+      return logs;
+    } catch (err) {
+      console.error("Error fetching admin purchase logs:", err);
+      return [];
+    }
+  }
+  const user = getLocalSessionUser();
+  const userEmail = user?.email || 'guest.pghive@example.com';
+  const paymentsKey = `pg_hub_payments_${userEmail}`;
+  return JSON.parse(localStorage.getItem(paymentsKey) || '[]');
 }
 
 export async function getAllUnlockedContacts(unlockedIds) {
   const contactsMap = {};
   if (!unlockedIds || unlockedIds.length === 0) return contactsMap;
   
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc } = await import('firebase/firestore');
       await Promise.all(
@@ -793,7 +854,9 @@ const MOCK_PGS_PUBLIC = [
     ],
     // Only masked contacts in public object
     contactPhone: '+91 98765 XXXXX',
-    contactEmail: 'dub****@example.com'
+    contactEmail: 'dub****@example.com',
+    lat: 12.9352,
+    lng: 77.6245
   },
   {
     id: 'mock-2',
@@ -810,7 +873,9 @@ const MOCK_PGS_PUBLIC = [
       'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=80'
     ],
     contactPhone: '+91 87654 XXXXX',
-    contactEmail: 'sta****@example.com'
+    contactEmail: 'sta****@example.com',
+    lat: 12.9121,
+    lng: 77.6446
   },
   {
     id: 'mock-3',
@@ -827,7 +892,9 @@ const MOCK_PGS_PUBLIC = [
       'https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=800&q=80'
     ],
     contactPhone: '+91 76543 XXXXX',
-    contactEmail: 'eli****@example.com'
+    contactEmail: 'eli****@example.com',
+    lat: 12.9719,
+    lng: 77.6412
   },
   {
     id: 'mock-4',
@@ -844,7 +911,9 @@ const MOCK_PGS_PUBLIC = [
       'https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?auto=format&fit=crop&w=800&q=80'
     ],
     contactPhone: '+91 65432 XXXXX',
-    contactEmail: 'whi****@example.com'
+    contactEmail: 'whi****@example.com',
+    lat: 12.9698,
+    lng: 77.7500
   },
   {
     id: 'mock-5',
@@ -861,7 +930,9 @@ const MOCK_PGS_PUBLIC = [
       'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80'
     ],
     contactPhone: '+91 95432 XXXXX',
-    contactEmail: 'chi****@example.com'
+    contactEmail: 'chi****@example.com',
+    lat: 12.9341,
+    lng: 77.6063
   },
   {
     id: 'mock-6',
@@ -878,7 +949,9 @@ const MOCK_PGS_PUBLIC = [
       'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80'
     ],
     contactPhone: '+91 84321 XXXXX',
-    contactEmail: 'hor****@example.com'
+    contactEmail: 'hor****@example.com',
+    lat: 12.9121,
+    lng: 77.6446
   },
   {
     id: 'mock-7',
@@ -895,7 +968,9 @@ const MOCK_PGS_PUBLIC = [
       'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80'
     ],
     contactPhone: '+91 73210 XXXXX',
-    contactEmail: 'oli****@example.com'
+    contactEmail: 'oli****@example.com',
+    lat: 12.9352,
+    lng: 77.6245
   },
   {
     id: 'mock-8',
@@ -912,7 +987,47 @@ const MOCK_PGS_PUBLIC = [
       'https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?auto=format&fit=crop&w=800&q=80'
     ],
     contactPhone: '+91 62109 XXXXX',
-    contactEmail: 'tec****@example.com'
+    contactEmail: 'tec****@example.com',
+    lat: 12.9569,
+    lng: 77.7011
+  },
+  {
+    id: 'mock-9',
+    name: 'Jain Nest student co-living',
+    locality: 'Jayanagar',
+    address: '9th Block, Jayanagar, near Jain University campus, Bangalore - 560069',
+    description: 'A premium student accommodation right next to Jain University Jayanagar campus. Offering fully furnished double and triple sharing rooms, daily nutritious meals, high-speed Wi-Fi, study rooms, power backup, and regular housekeeping.',
+    price: 9000,
+    gender: 'unisex',
+    sharing: { double: 12000, triple: 9000 },
+    amenities: ['wifi', 'food', 'backup', 'security'],
+    images: [
+      'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=800&q=80'
+    ],
+    contactPhone: '+91 93210 XXXXX',
+    contactEmail: 'jai****@example.com',
+    lat: 12.9152,
+    lng: 77.5845
+  },
+  {
+    id: 'mock-10',
+    name: 'Colive Infinity Hub',
+    locality: 'Benniganahalli',
+    address: 'Near RMZ Infinity, Old Madras Road, Benniganahalli, Bangalore - 560016',
+    description: 'Premium co-living PG near RMZ Infinity tech park and Old Madras Road. Offers twin sharing and single rooms, high-speed Wi-Fi, daily meals, laundry, and 24/7 security. Ideal for working professionals near RMZ Old Madras Road.',
+    price: 11500,
+    gender: 'unisex',
+    sharing: { single: 16000, double: 11500 },
+    amenities: ['wifi', 'food', 'ac', 'laundry', 'backup', 'security'],
+    images: [
+      'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
+      'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=80'
+    ],
+    contactPhone: '+91 82109 XXXXX',
+    contactEmail: 'inf****@example.com',
+    lat: 12.9934,
+    lng: 77.6602
   }
 ];
 
@@ -925,12 +1040,14 @@ const MOCK_PRIVATE_CONTACTS = {
   'mock-5': { phone: '+91 95432 09876', email: 'chicago.stanza@example.com', whatsapp: '+91 95432 09876' },
   'mock-6': { phone: '+91 84321 98765', email: 'horizon.zolo@example.com', whatsapp: '+91 84321 98765' },
   'mock-7': { phone: '+91 73210 87654', email: 'olive.premium@example.com', whatsapp: '+91 73210 87654' },
-  'mock-8': { phone: '+91 62109 76543', email: 'techforest.hello@example.com', whatsapp: '+91 62109 76543' }
+  'mock-8': { phone: '+91 62109 76543', email: 'techforest.hello@example.com', whatsapp: '+91 62109 76543' },
+  'mock-9': { phone: '+91 93210 76543', email: 'jainnest.co@example.com', whatsapp: '+91 93210 76543' },
+  'mock-10': { phone: '+91 82109 65432', email: 'infinity.colive@example.com', whatsapp: '+91 82109 65432' }
 };
 
 // Initialize localStorage stores on first visit
 const existingPgsList = JSON.parse(localStorage.getItem('pgs_list') || '[]');
-if (existingPgsList.length <= 4) {
+if (existingPgsList.length < MOCK_PGS_PUBLIC.length) {
   localStorage.setItem('pgs_list', JSON.stringify(MOCK_PGS_PUBLIC));
 }
 // Merge any missing mock private contacts (robust fallback for local storage cache)
@@ -946,20 +1063,20 @@ if (needsUpdate || !localStorage.getItem(CONTACTS_STORE_KEY)) {
   localStorage.setItem(CONTACTS_STORE_KEY, JSON.stringify(currentContacts));
 }
 
-// Seed tester mock user account (email: tester@pgwala.com, password: password123, verified: true)
-const MOCK_TESTER_EMAIL = 'tester@pgwala.com';
-const localUsersList = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
+// Seed tester mock user account (email: tester@pghive.com, password: password123, verified: true)
+const MOCK_TESTER_EMAIL = 'tester@pghive.com';
+const localUsersList = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
 if (!localUsersList.find(u => u.email === MOCK_TESTER_EMAIL)) {
   localUsersList.push({
     uid: 'tester-uid',
     email: MOCK_TESTER_EMAIL,
     emailVerified: true
   });
-  localStorage.setItem('pg_wala_mock_users', JSON.stringify(localUsersList));
+  localStorage.setItem('pg_hub_mock_users', JSON.stringify(localUsersList));
 }
 
 // Seed 10 credits for tester user account
-const testerCreditsKey = `pg_wala_credits_signed_${MOCK_TESTER_EMAIL}`;
+const testerCreditsKey = `pg_hub_credits_signed_${MOCK_TESTER_EMAIL}`;
 if (!localStorage.getItem(testerCreditsKey)) {
   (async () => {
     try {
@@ -978,7 +1095,7 @@ if (!localStorage.getItem(testerCreditsKey)) {
 export async function fetchAllPGs() {
   try {
     const currentUserId = isFirebaseActive ? auth.currentUser?.uid : getLocalSessionUser()?.uid;
-    const adminEmail = import.meta.env?.VITE_ADMIN_USER || 'admin@pgwala.com';
+    const adminEmail = import.meta.env?.VITE_ADMIN_USER || 'admin@pghive.com';
     const currentUserEmail = isFirebaseActive ? auth.currentUser?.email : getLocalSessionUser()?.email;
     const isAdmin = currentUserEmail === adminEmail || currentUserId === 'local-admin';
 
@@ -1173,6 +1290,17 @@ export async function createPGListing(pgData, imageFiles) {
       }
     }
   }
+
+  // Validate sharing deposits
+  const validatedSharingDeposit = {};
+  for (const [key, val] of Object.entries(pgData.sharingDeposit || {})) {
+    if (val) {
+      const shareDeposit = validatePrice(val);
+      if (shareDeposit.valid) {
+        validatedSharingDeposit[key] = shareDeposit.value;
+      }
+    }
+  }
   
   // Sanitized data object
   const sanitizedData = {
@@ -1182,13 +1310,16 @@ export async function createPGListing(pgData, imageFiles) {
     description: descClean,
     price: priceResult.value,
     deposit: pgData.deposit ? Number(pgData.deposit) : 0,
+    sharingDeposit: validatedSharingDeposit,
     gender: ['boys', 'girls', 'unisex'].includes(pgData.gender) ? pgData.gender : 'unisex',
     sharing: validatedSharing,
     amenities: Array.isArray(pgData.amenities) 
       ? pgData.amenities.filter(a => typeof a === 'string' && a.length < 50) 
       : [],
     furnishing: sanitizeText(pgData.furnishing || 'Semi Furnished', 50),
-    availableFrom: sanitizeText(pgData.availableFrom || 'Immediate', 50)
+    availableFrom: sanitizeText(pgData.availableFrom || 'Immediate', 50),
+    ...(pgData.lat !== undefined && !isNaN(Number(pgData.lat)) && { lat: Number(pgData.lat) }),
+    ...(pgData.lng !== undefined && !isNaN(Number(pgData.lng)) && { lng: Number(pgData.lng) })
   };
 
   // Real contacts (stored privately)
@@ -1207,38 +1338,59 @@ export async function createPGListing(pgData, imageFiles) {
     contactEmail: maskEmailAddress(realContacts.email)
   };
 
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { collection, addDoc, doc, setDoc, query, where, getDocs, getDoc } = await import('firebase/firestore');
-      const userId = auth.currentUser?.uid || getAnonymousUserId();
+      const userId = auth.currentUser.uid;
 
-      // 1. Phone number deduplication check (max 3 owner accounts for the same phone number)
-      const { collectionGroup } = await import('firebase/firestore');
-      const contactQuery = query(collectionGroup(db, 'private'), where('phone', '==', realContacts.phone));
-      const querySnapshot = await getDocs(contactQuery);
-      const ownerIds = new Set();
-      for (const d of querySnapshot.docs) {
-        const pgDocRef = d.ref.parent.parent;
-        if (pgDocRef) {
-          const pgSnap = await getDoc(pgDocRef);
-          if (pgSnap.exists() && pgSnap.data().ownerId !== userId) {
-            ownerIds.add(pgSnap.data().ownerId);
+      // 1. Phone number deduplication check (only admins can query across all private contacts due to Firestore security rules)
+      {
+        const adminEmail = import.meta.env?.VITE_ADMIN_USER || 'admin@pghive.com';
+        const currentUserEmail = auth.currentUser?.email;
+        const isAdmin = currentUserEmail === adminEmail;
+
+        if (isAdmin) {
+          const { collectionGroup } = await import('firebase/firestore');
+          const contactQuery = query(collectionGroup(db, 'private'), where('phone', '==', realContacts.phone));
+          const querySnapshot = await getDocs(contactQuery);
+          const ownerIds = new Set();
+          for (const d of querySnapshot.docs) {
+            const pgDocRef = d.ref.parent.parent;
+            if (pgDocRef) {
+              const pgSnap = await getDoc(pgDocRef);
+              if (pgSnap.exists() && pgSnap.data().ownerId !== userId) {
+                ownerIds.add(pgSnap.data().ownerId);
+              }
+            }
+          }
+          if (ownerIds.size >= 3) {
+            throw new Error("This phone number is associated with too many different accounts. Please contact support.");
           }
         }
       }
-      if (ownerIds.size >= 3) {
-        throw new Error("This phone number is associated with too many different accounts. Please contact support.");
-      }
       
-      // 2. Compress and convert images to Base64
+      // 2. Compress, upload to Firebase Storage, and get URLs
       const uploadedImageUrls = [];
+      const newHashes = [];
+      const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+      
       for (let i = 0; i < imageFiles.length; i++) {
         const file = imageFiles[i];
         try {
           const base64Str = await compressImage(file);
-          uploadedImageUrls.push(base64Str);
+          const response = await fetch(base64Str);
+          const blob = await response.blob();
+          
+          const fileId = 'img_' + Math.random().toString(36).substring(2, 15);
+          const imageRef = ref(storage, `listings/${userId}/${fileId}.jpg`);
+          await uploadBytes(imageRef, blob);
+          const downloadUrl = await getDownloadURL(imageRef);
+          
+          uploadedImageUrls.push(downloadUrl);
+          const h = await calculateBase64Hash(base64Str);
+          newHashes.push(h);
         } catch (compressErr) {
-          console.error("Compression failed, using fallback FileReader:", compressErr);
+          console.error("Firebase Storage upload failed, using fallback Base64:", compressErr);
           const fallbackBase64 = await new Promise((res, rej) => {
             const r = new FileReader();
             r.onload = () => res(r.result);
@@ -1246,15 +1398,12 @@ export async function createPGListing(pgData, imageFiles) {
             r.readAsDataURL(file);
           });
           uploadedImageUrls.push(fallbackBase64);
+          const h = await calculateBase64Hash(fallbackBase64);
+          newHashes.push(h);
         }
       }
 
       // 3. Image hash duplicate check (prevent spam duplicates)
-      const newHashes = [];
-      for (const base64 of uploadedImageUrls) {
-        const h = await calculateBase64Hash(base64);
-        newHashes.push(h);
-      }
       const duplicateQuery = query(collection(db, 'pgs'), where('imageHashes', 'array-contains-any', newHashes));
       const duplicateSnapshot = await getDocs(duplicateQuery);
       for (const d of duplicateSnapshot.docs) {
@@ -1267,7 +1416,7 @@ export async function createPGListing(pgData, imageFiles) {
       const creationTime = auth.currentUser?.metadata.creationTime;
       const accountAgeMs = creationTime ? Date.now() - new Date(creationTime).getTime() : 0;
       const isNewAccount = accountAgeMs < 24 * 60 * 60 * 1000;
-      const adminEmail = import.meta.env?.VITE_ADMIN_USER || 'admin@pgwala.com';
+      const adminEmail = import.meta.env?.VITE_ADMIN_USER || 'admin@pghive.com';
       const currentUserEmail = auth.currentUser?.email;
       const isAdmin = currentUserEmail === adminEmail;
       
@@ -1348,7 +1497,7 @@ export async function createPGListing(pgData, imageFiles) {
 
   // 4. Delayed activation check locally
   const user = getLocalSessionUser();
-  const localUsersList = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
+  const localUsersList = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
   const localUser = localUsersList.find(u => u.email === (user?.email || ''));
   const userCreationTime = localUser?.createdAt || Date.now();
   const accountAgeMs = Date.now() - userCreationTime;
@@ -1388,7 +1537,7 @@ export async function deletePGListing(pgId) {
     throw new Error(limit.error);
   }
 
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, deleteDoc, getDoc } = await import('firebase/firestore');
       const { ref, deleteObject } = await import('firebase/storage');
@@ -1532,11 +1681,27 @@ export async function updatePGListing(pgId, pgData, imageFilesOrUrls) {
         });
       }
       
-      // Save locally if in Local Mode, else push Base64 directly
-      if (isFirebaseActive) {
-        finalImages.push(base64);
-        const h = await calculateBase64Hash(base64);
-        newHashes.push(h);
+      // Save locally if in Local Mode, else upload to Firebase Storage
+      if (isFirebaseOperational()) {
+        try {
+          const response = await fetch(base64);
+          const blob = await response.blob();
+          const userId = auth.currentUser.uid;
+          const { ref, uploadBytes, getDownloadURL } = await import('firebase/storage');
+          const fileId = 'img_' + Math.random().toString(36).substring(2, 15);
+          const imageRef = ref(storage, `listings/${userId}/${fileId}.jpg`);
+          await uploadBytes(imageRef, blob);
+          const downloadUrl = await getDownloadURL(imageRef);
+          
+          finalImages.push(downloadUrl);
+          const h = await calculateBase64Hash(base64);
+          newHashes.push(h);
+        } catch (uploadErr) {
+          console.error("Firebase Storage upload failed, using fallback Base64:", uploadErr);
+          finalImages.push(base64);
+          const h = await calculateBase64Hash(base64);
+          newHashes.push(h);
+        }
       } else {
         const imageKey = `local-img-${pgId}-${Date.now()}-${i}`;
         const savedBase64 = await savePhoto(imageKey, item);
@@ -1547,7 +1712,7 @@ export async function updatePGListing(pgId, pgData, imageFilesOrUrls) {
     } else if (typeof item === 'string') {
       // Existing image URL / Base64 / Local key
       finalImages.push(item);
-      if (isFirebaseActive) {
+      if (isFirebaseOperational()) {
         const h = await calculateBase64Hash(item);
         newHashes.push(h);
       } else {
@@ -1598,6 +1763,17 @@ export async function updatePGListing(pgId, pgData, imageFilesOrUrls) {
     }
   }
 
+  // Validate sharing deposits
+  const validatedSharingDeposit = {};
+  for (const [key, val] of Object.entries(pgData.sharingDeposit || {})) {
+    if (val) {
+      const shareDeposit = validatePrice(val);
+      if (shareDeposit.valid) {
+        validatedSharingDeposit[key] = shareDeposit.value;
+      }
+    }
+  }
+
   const sanitizedData = {
     name: nameClean,
     locality: sanitizeText(pgData.locality, 100),
@@ -1605,13 +1781,16 @@ export async function updatePGListing(pgId, pgData, imageFilesOrUrls) {
     description: descClean,
     price: priceResult.value,
     deposit: pgData.deposit ? Number(pgData.deposit) : 0,
+    sharingDeposit: validatedSharingDeposit,
     gender: ['boys', 'girls', 'unisex'].includes(pgData.gender) ? pgData.gender : 'unisex',
     sharing: validatedSharing,
     amenities: Array.isArray(pgData.amenities) 
       ? pgData.amenities.filter(a => typeof a === 'string' && a.length < 50) 
       : [],
     furnishing: sanitizeText(pgData.furnishing || 'Semi Furnished', 50),
-    availableFrom: sanitizeText(pgData.availableFrom || 'Immediate', 50)
+    availableFrom: sanitizeText(pgData.availableFrom || 'Immediate', 50),
+    ...(pgData.lat !== undefined && !isNaN(Number(pgData.lat)) && { lat: Number(pgData.lat) }),
+    ...(pgData.lng !== undefined && !isNaN(Number(pgData.lng)) && { lng: Number(pgData.lng) })
   };
 
   const realContacts = {
@@ -1628,7 +1807,7 @@ export async function updatePGListing(pgId, pgData, imageFilesOrUrls) {
     contactEmail: maskEmailAddress(realContacts.email)
   };
 
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc, updateDoc, setDoc } = await import('firebase/firestore');
       const docRef = doc(db, 'pgs', pgId);
@@ -1638,7 +1817,7 @@ export async function updatePGListing(pgId, pgData, imageFilesOrUrls) {
       }
 
       const existingData = docSnap.data();
-      const currentUserId = auth.currentUser?.uid;
+      const currentUserId = auth.currentUser.uid;
       const isAdminUser = auth.currentUser && !auth.currentUser.isAnonymous;
 
       if (existingData.ownerId !== currentUserId && !isAdminUser) {
@@ -1716,7 +1895,7 @@ export async function updatePGListing(pgId, pgData, imageFilesOrUrls) {
 }
 
 export async function getAdminPGContactDetails(pgId) {
-  if (isFirebaseActive) {
+  if (isFirebaseOperational()) {
     try {
       const { doc, getDoc } = await import('firebase/firestore');
       const contactDoc = await getDoc(doc(db, 'pgs', pgId, 'private', 'contacts'));
@@ -1740,7 +1919,7 @@ export async function getAdminPGContactDetails(pgId) {
 // Admin credentials from environment variables (NOT hardcoded)
 const ENV_ADMIN_USER = import.meta.env?.VITE_ADMIN_USER;
 const ENV_ADMIN_PASS = import.meta.env?.VITE_ADMIN_PASS;
-const isLocalAdminConfigured = !!(ENV_ADMIN_USER && (ENV_ADMIN_PASS || localStorage.getItem('pg_wala_admin_pass')));
+const isLocalAdminConfigured = !!(ENV_ADMIN_USER && (ENV_ADMIN_PASS || localStorage.getItem('pg_hub_admin_pass')));
 
 export { isLocalAdminConfigured };
 
@@ -1824,7 +2003,7 @@ export async function authenticateAdmin(usernameOrEmail, password) {
     throw new Error("Admin login is not configured. Set VITE_ADMIN_USER and VITE_ADMIN_PASS in your .env file.");
   }
   
-  const storedPass = localStorage.getItem('pg_wala_admin_pass');
+  const storedPass = localStorage.getItem('pg_hub_admin_pass');
   let isValid = false;
 
   if (storedPass) {
@@ -1837,7 +2016,7 @@ export async function authenticateAdmin(usernameOrEmail, password) {
       if (inputHash === storedPass) {
         // Upgrade legacy hash on successful login
         const upgradedHash = await hashPasswordWithBcrypt(password);
-        localStorage.setItem('pg_wala_admin_pass', upgradedHash);
+        localStorage.setItem('pg_hub_admin_pass', upgradedHash);
         isValid = true;
       }
     }
@@ -1847,7 +2026,7 @@ export async function authenticateAdmin(usernameOrEmail, password) {
     if (password === fallbackPassword) {
       // Create and save the new bcrypt hash immediately
       const newHash = await hashPasswordWithBcrypt(password);
-      localStorage.setItem('pg_wala_admin_pass', newHash);
+      localStorage.setItem('pg_hub_admin_pass', newHash);
       isValid = true;
     }
   }
@@ -1888,6 +2067,8 @@ export async function logoutAdminSession() {
   return true;
 }
 
+let anonymousAuthFailed = false;
+
 export function subscribeToAuth(callback) {
   if (isFirebaseActive) {
     const unsub = auth.onAuthStateChanged(async (user) => {
@@ -1899,11 +2080,14 @@ export function subscribeToAuth(callback) {
         }
       } else {
         // Automatically sign in anonymously if not authenticated, giving them a real Firebase Auth UUID
-        try {
-          const { signInAnonymously } = await import('firebase/auth');
-          await signInAnonymously(auth);
-        } catch (e) {
-          console.error("Anonymous authentication failed:", e);
+        if (!anonymousAuthFailed) {
+          try {
+            const { signInAnonymously } = await import('firebase/auth');
+            await signInAnonymously(auth);
+          } catch (e) {
+            console.error("Anonymous authentication failed:", e);
+            anonymousAuthFailed = true;
+          }
         }
         callback(null);
       }
@@ -1983,7 +2167,7 @@ export async function sendPasswordReset(email) {
   
   const token = crypto.randomUUID();
   const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes expiry
-  localStorage.setItem('pg_wala_reset_token', JSON.stringify({ token, email, expiresAt }));
+  localStorage.setItem('pg_hub_reset_token', JSON.stringify({ token, email, expiresAt }));
   console.log(`[MOCK RESET LINK] http://localhost:5173/?reset-token=${token}`);
   return { 
     success: true, 
@@ -2006,7 +2190,7 @@ export async function verifyResetTokenAndChangePassword(token, newPassword) {
     return true;
   }
   
-  const stored = localStorage.getItem('pg_wala_reset_token');
+  const stored = localStorage.getItem('pg_hub_reset_token');
   if (!stored) {
     throw new Error("Invalid or expired password reset link.");
   }
@@ -2014,14 +2198,14 @@ export async function verifyResetTokenAndChangePassword(token, newPassword) {
   try {
     const { token: storedToken, expiresAt } = JSON.parse(stored);
     if (storedToken !== token || Date.now() > expiresAt) {
-      localStorage.removeItem('pg_wala_reset_token');
+      localStorage.removeItem('pg_hub_reset_token');
       throw new Error("This password reset link has expired.");
     }
     
     // Update password locally using Bcrypt
     const hashedNewPassword = await hashPasswordWithBcrypt(newPassword);
-    localStorage.setItem('pg_wala_admin_pass', hashedNewPassword);
-    localStorage.removeItem('pg_wala_reset_token');
+    localStorage.setItem('pg_hub_admin_pass', hashedNewPassword);
+    localStorage.removeItem('pg_hub_reset_token');
     return true;
   } catch (err) {
     throw new Error(err.message || "Invalid or expired password reset link.", { cause: err });
@@ -2047,18 +2231,20 @@ export async function registerTenantUser(email, password) {
     if (!isTestEmail) {
       await sendEmailVerification(userCredential.user);
     }
-    return userCredential.user;
+    const user = userCredential.user;
+    user.isNewUser = true;
+    return user;
   }
   
   // Local mode mock registration
-  const localUsers = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
+  const localUsers = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
   if (localUsers.find(u => u.email === email)) {
     throw new Error("Email already registered.");
   }
   const passwordHash = await hashPasswordWithBcrypt(password);
   const newUser = { uid: crypto.randomUUID(), email, emailVerified: false, passwordHash, createdAt: Date.now() };
   localUsers.push(newUser);
-  localStorage.setItem('pg_wala_mock_users', JSON.stringify(localUsers));
+  localStorage.setItem('pg_hub_mock_users', JSON.stringify(localUsers));
   
   // Log mock verification link to console for developers
   const mockToken = crypto.randomUUID();
@@ -2126,7 +2312,7 @@ export async function loginTenantUser(email, password) {
   }
   
   // Local Mode Mock Login
-  const localUsers = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
+  const localUsers = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
   const userIndex = localUsers.findIndex(u => u.email === email);
   if (userIndex === -1) {
     await recordFailedLogin(email);
@@ -2138,12 +2324,12 @@ export async function loginTenantUser(email, password) {
   if (user.passwordHash) {
     isValidPassword = await verifyPasswordWithBcrypt(password, user.passwordHash);
   } else {
-    // Safe Migration Check: Seeded mock users (e.g. tester@pgwala.com) default to 'password123'
+    // Safe Migration Check: Seeded mock users (e.g. tester@pghive.com) default to 'password123'
     if (password === 'password123') {
       const upgradedHash = await hashPasswordWithBcrypt(password);
       user.passwordHash = upgradedHash;
       localUsers[userIndex] = user;
-      localStorage.setItem('pg_wala_mock_users', JSON.stringify(localUsers));
+      localStorage.setItem('pg_hub_mock_users', JSON.stringify(localUsers));
       isValidPassword = true;
     }
   }
@@ -2176,9 +2362,9 @@ export async function verifyTenantEmailLocally(uid, token) {
   }
   const storedToken = localStorage.getItem(`verify_${uid}`);
   if (storedToken && storedToken === token) {
-    const localUsers = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
+    const localUsers = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
     const updated = localUsers.map(u => u.uid === uid ? { ...u, emailVerified: true } : u);
-    localStorage.setItem('pg_wala_mock_users', JSON.stringify(updated));
+    localStorage.setItem('pg_hub_mock_users', JSON.stringify(updated));
     localStorage.removeItem(`verify_${uid}`);
     return true;
   }
@@ -2187,15 +2373,36 @@ export async function verifyTenantEmailLocally(uid, token) {
 
 export async function signInWithGoogle() {
   if (isFirebaseActive) {
-    const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+    const { signInWithPopup, signInWithRedirect, GoogleAuthProvider, getAdditionalUserInfo } = await import('firebase/auth');
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' }); // Enforce showing the Google Account Selection screen
+    
     try {
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
+      const additionalInfo = getAdditionalUserInfo(userCredential);
+      if (additionalInfo?.isNewUser) {
+        user.isNewUser = true;
+      }
       await getUserCredits(); // auto-initialize credits
       return user;
     } catch (error) {
-      console.error("[GOOGLE AUTH ERROR]:", error);
+      console.error("[GOOGLE AUTH ERROR POPUP]:", error);
+      
+      const isPopupBlocked = error.code === 'auth/popup-blocked' || 
+                            error.code === 'auth/popup-closed-by-user' ||
+                            error.code === 'auth/cancelled-popup-request';
+                            
+      if (isPopupBlocked) {
+        try {
+          await signInWithRedirect(auth, provider);
+          return new Promise(() => {}); // Page will redirect, return pending promise
+        } catch (redirectError) {
+          console.error("Google Sign-In Redirect failed:", redirectError);
+          throw new Error(`Google Authentication failed. (Detail: ${redirectError.code || redirectError.message})`, { cause: redirectError });
+        }
+      }
+      
       throw new Error(`Google Authentication failed. (Detail: ${error.code || error.message})`, { cause: error });
     }
   }
@@ -2210,7 +2417,7 @@ export async function signInWithGoogle() {
     emailVerified: true
   };
 
-  const localUsers = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
+  const localUsers = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
   localUsers.push({
     uid: mockUser.uid,
     email: mockUser.email,
@@ -2218,11 +2425,11 @@ export async function signInWithGoogle() {
     passwordHash: null,
     createdAt: Date.now()
   });
-  localStorage.setItem('pg_wala_mock_users', JSON.stringify(localUsers));
+  localStorage.setItem('pg_hub_mock_users', JSON.stringify(localUsers));
 
   const emailKey = `_${mockUser.email}`;
   const sig = await hmacSign(10);
-  localStorage.setItem(`pg_wala_credits_signed${emailKey}`, JSON.stringify({ value: 10, sig }));
+  localStorage.setItem(`pg_hub_credits_signed${emailKey}`, JSON.stringify({ value: 10, sig }));
 
   localStorage.setItem('tenant_session', JSON.stringify(mockUser));
   window.dispatchEvent(new Event('storage'));
@@ -2275,7 +2482,7 @@ export async function sendOTPToPhone(phoneNumber, verifier) {
   return {
     confirm: async (code) => {
       if (code === '123456') {
-        const mockEmail = `phone.${phoneNumber.replace(/[+]/g, '')}@pgwala.com`;
+        const mockEmail = `phone.${phoneNumber.replace(/[+]/g, '')}@pghive.com`;
         const mockUser = {
           uid: `phone-${crypto.randomUUID()}`,
           email: mockEmail,
@@ -2284,7 +2491,7 @@ export async function sendOTPToPhone(phoneNumber, verifier) {
           emailVerified: true
         };
 
-        const localUsers = JSON.parse(localStorage.getItem('pg_wala_mock_users') || '[]');
+        const localUsers = JSON.parse(localStorage.getItem('pg_hub_mock_users') || '[]');
         if (!localUsers.find(u => u.uid === mockUser.uid)) {
           localUsers.push({
             uid: mockUser.uid,
@@ -2293,12 +2500,12 @@ export async function sendOTPToPhone(phoneNumber, verifier) {
             passwordHash: null,
             createdAt: Date.now()
           });
-          localStorage.setItem('pg_wala_mock_users', JSON.stringify(localUsers));
+          localStorage.setItem('pg_hub_mock_users', JSON.stringify(localUsers));
         }
 
         const emailKey = `_${mockUser.email}`;
         const sig = await hmacSign(10);
-        localStorage.setItem(`pg_wala_credits_signed${emailKey}`, JSON.stringify({ value: 10, sig }));
+        localStorage.setItem(`pg_hub_credits_signed${emailKey}`, JSON.stringify({ value: 10, sig }));
 
         localStorage.setItem('tenant_session', JSON.stringify(mockUser));
         window.dispatchEvent(new Event('storage'));

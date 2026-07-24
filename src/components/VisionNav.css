@@ -1,8 +1,8 @@
 /* =============================================
-   Apple Vision Pro — Floating Island Navbar
+   PGhive — Minimal Underline Navbar
    ============================================= */
 
-/* Fixed position wrapper — sits above all content */
+/* Fixed full-width wrapper */
 .vision-nav-wrap {
   position: fixed;
   top: 0;
@@ -11,14 +11,12 @@
   z-index: 1000;
   display: flex;
   justify-content: center;
-  padding: 16px 20px;
-  pointer-events: none; /* let clicks pass through to the page */
+  pointer-events: none;
 
   /* Entrance: slide down + fade in */
   opacity: 0;
-  transform: translateY(-16px);
-  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(-8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 .vision-nav-wrap.mounted {
@@ -26,162 +24,118 @@
   transform: translateY(0);
 }
 
-/* The pill itself */
+/* The header bar — full width, white, flat */
 .vision-nav {
-  pointer-events: auto; /* re-enable clicks on the pill */
-  display: inline-flex;
+  pointer-events: auto;
+  display: flex;
   align-items: center;
-  gap: 0;
-  height: 48px;
-  padding: 0 6px;
-  border-radius: 9999px;
+  width: 100%;
+  height: 64px;
+  padding: 0 48px;
 
-  /* Frosted glass */
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  background: #ffffff;
+  border-bottom: 1px solid #f0f0f0;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
 
-  /* Subtle border — mimics Vision Pro glass ring */
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    0 12px 40px rgba(0, 0, 0, 0.10),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-
-  transition:
-    height 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    padding 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s ease,
-    background 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
-/* Slightly more compact after scrolling */
+/* Slightly more elevated after scrolling */
 .vision-nav.scrolled {
-  height: 42px;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.07),
-    0 16px 48px rgba(0, 0, 0, 0.13),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+  border-bottom-color: #e8e8e8;
 }
 
-/* Dark mode pill */
-[data-theme="dark"] .vision-nav {
-  background: rgba(24, 24, 27, 0.78);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.35),
-    0 12px 40px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
-}
-
-[data-theme="dark"] .vision-nav.scrolled {
-  background: rgba(9, 9, 11, 0.88);
-  box-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.4),
-    0 16px 48px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-
-
-
-/* ---- Logo pill ---- */
+/* ---- Logo ---- */
 .vision-nav-logo {
   display: flex;
   align-items: center;
-  padding: 0 16px 0 12px;
-  height: 36px;
   border: none;
-  background: var(--gradient-primary);
-  color: var(--colors-on-primary);
-  border-radius: 9999px;
+  background: transparent;
   cursor: pointer;
-  font-family: var(--font-family-display);
-  font-weight: 800;
-  font-size: 14.5px;
-  letter-spacing: -0.4px;
-  text-transform: lowercase;
-  white-space: nowrap;
   outline: none;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.2s ease;
-  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);
+  padding: 0;
+  margin-right: auto; /* push nav items to the right */
+  transition: opacity 0.2s ease;
 }
 
 .vision-nav-logo:hover {
-  transform: translateY(-1px) scale(1.03);
-  box-shadow: 0 6px 16px rgba(225, 29, 72, 0.4);
+  opacity: 0.8;
 }
 
 .vision-nav-logo:active {
-  transform: translateY(1px) scale(0.97);
+  opacity: 0.6;
 }
 
-/* ---- Separator ---- */
+/* ---- Separator — hidden in minimal style ---- */
 .vision-nav-sep {
-  width: 1px;
-  height: 20px;
-  background: var(--colors-hairline);
-  margin: 0 6px;
-  flex-shrink: 0;
-  border-radius: 1px;
+  display: none;
 }
 
 /* ---- Nav items row ---- */
 .vision-nav-items {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-right: 4px;
+  gap: 4px;
 }
 
 /* ---- Individual nav item ---- */
 .vision-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 16px;
-  height: 36px;
+  gap: 5px;
+  padding: 0 14px;
+  height: 40px;
   border: none;
   background: transparent;
-  border-radius: 9999px;
+  border-radius: 0;
   cursor: pointer;
   outline: none;
 
-  font-family: var(--font-family-display);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.1px;
-  color: var(--colors-ink);
-  text-transform: lowercase;
+  font-family: var(--font-family-body);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #111111;
+  text-transform: none;
   white-space: nowrap;
 
-  transition: background 0.18s ease, color 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: color 0.2s ease;
+}
+
+/* Underline pseudo-element */
+.vision-nav-item::after {
+  content: '';
+  position: absolute;
+  bottom: 6px;
+  left: 14px;
+  right: 14px;
+  height: 2px;
+  background: #2563eb;
+  border-radius: 2px;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .vision-nav-item:hover {
-  background: rgba(225, 29, 72, 0.05);
-  transform: scale(1.02);
+  color: #2563eb;
 }
 
-[data-theme="dark"] .vision-nav-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+.vision-nav-item:hover::after {
+  transform: scaleX(1);
 }
 
 .vision-nav-item:active {
-  transform: scale(0.96);
-  background: rgba(0, 0, 0, 0.1);
-}
-
-[data-theme="dark"] .vision-nav-item:active {
-  background: rgba(255, 255, 255, 0.12);
+  color: #1d4ed8;
 }
 
 /* ---- Icon ---- */
 .vision-nav-item-icon {
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1;
-  opacity: 0.7;
+  opacity: 0.6;
   flex-shrink: 0;
 }
 
@@ -191,46 +145,166 @@
 }
 
 /* ============================================
-   Page content offset — push hero below nav
+   Page content offset — push content below nav
    ============================================ */
 .vision-nav-page-offset {
-  padding-top: 80px;
+  padding-top: 64px;
+}
+
+/* Hamburger Trigger (Hidden by default on desktop) */
+.mobile-menu-trigger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  outline: none;
+  padding: 8px;
+  color: var(--colors-ink);
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.mobile-menu-trigger:hover {
+  background-color: var(--colors-surface-soft);
 }
 
 /* ============================================
-   Mobile: stays centered, compresses items
+   Mobile Viewport Adjustments
    ============================================ */
-@media (max-width: 600px) {
-  .vision-nav-wrap {
-    padding: 12px 14px;
-  }
-
+@media (max-width: 767px) {
   .vision-nav {
-    height: 44px;
-    width: 100%;
-    max-width: 100%;
-    justify-content: space-between;
-    padding: 0 4px;
+    height: 56px;
+    padding: 0 16px;
   }
 
-  .vision-nav-logo {
-    font-size: 13px;
-    padding: 0 12px 0 8px;
-    height: 34px;
+  .vision-nav-items {
+    display: none !important; /* Hide horizontal navigation on mobile */
   }
 
-  .vision-nav-sep {
-    margin: 0 4px;
+  .mobile-menu-trigger {
+    display: flex; /* Show hamburger button on mobile */
   }
+}
 
-  .vision-nav-item {
-    padding: 0 9px;
-    font-size: 11.5px;
-    height: 34px;
-    gap: 3px;
-  }
+/* ============================================
+   Mobile Slide-out Navigation Drawer
+   ============================================ */
+.mobile-sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  background-color: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(6px);
+  display: flex;
+  justify-content: flex-end;
+  animation: fade-in-backdrop 0.25s ease-out;
+  pointer-events: auto; /* ensure click capture works */
+}
 
-  .vision-nav-item-icon {
-    font-size: 11px;
-  }
+.mobile-sidebar-panel {
+  width: 280px;
+  height: 100%;
+  background-color: var(--colors-surface-card);
+  box-shadow: -4px 0 24px rgba(15, 23, 42, 0.15);
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: slide-in-panel 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.mobile-sidebar-title {
+  font-family: var(--font-family-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--colors-ink);
+  letter-spacing: -0.5px;
+}
+
+.mobile-sidebar-close {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--colors-muted);
+  padding: 6px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.mobile-sidebar-close:hover {
+  background-color: var(--colors-surface-soft);
+  color: var(--colors-ink);
+}
+
+.mobile-sidebar-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  border-radius: var(--rounded-md);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-family-body);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--colors-body);
+  transition: background-color 0.2s ease, color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.mobile-sidebar-item:hover {
+  background-color: var(--colors-canvas-parchment);
+  color: var(--colors-primary);
+}
+
+.mobile-sidebar-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--colors-muted);
+  opacity: 0.8;
+  transition: color 0.2s ease;
+}
+
+.mobile-sidebar-item:hover .mobile-sidebar-item-icon {
+  color: var(--colors-primary);
+}
+
+.mobile-sidebar-item-label {
+  line-height: 1;
+  text-transform: capitalize;
+}
+
+@keyframes fade-in-backdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-panel {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }

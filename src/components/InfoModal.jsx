@@ -58,7 +58,7 @@ export default function InfoModal({ type, onClose }) {
       sections: [
         {
           heading: "Market Opportunity",
-          text: "Bangalore has over 1.5 million students and migrating tech professionals. The unstructured PG market is ripe for digital transformation. PG wala fills this gap with direct-from-owner listings, eliminating brokerage fees."
+          text: "Bangalore has over 1.5 million students and migrating tech professionals. The unstructured PG market is ripe for digital transformation. PGhive fills this gap with direct-from-owner listings, eliminating brokerage fees."
         },
         {
           heading: "Financial Growth",
@@ -71,24 +71,24 @@ export default function InfoModal({ type, onClose }) {
       ]
     },
     features: {
-      title: "What's New in PG wala",
+      title: "What's New in PGhive",
       subtitle: "Explore our latest security and feature updates",
       icon: Sparkles,
       sections: [
         {
-          heading: "💳 Razorpay Test Checkout",
+          heading: "Razorpay Test Checkout",
           text: "You can now purchase unlock packs using simulated UPI, Card, and Netbanking gateways directly in our test sandbox."
         },
         {
-          heading: "🔒 HMAC Signed Credit Store",
+          heading: "HMAC Signed Credit Store",
           text: "Enhanced client-side credit validation using HMAC-SHA256 signatures to prevent credit balance manipulation and tampering."
         },
         {
-          heading: "🛡️ Strict Input Sanitization",
+          heading: "Strict Input Sanitization",
           text: "All property listings undergo rigorous XSS injection checks, rejecting any HTML script tags, oversized payloads, or invalid uploads."
         },
         {
-          heading: "📱 Fully Responsive Layout",
+          heading: "Fully Responsive Layout",
           text: "Optimized mobile grid stacking and aligned headers for a premium viewing experience on any screen size."
         }
       ]
@@ -100,7 +100,7 @@ export default function InfoModal({ type, onClose }) {
       sections: [
         {
           heading: "Our Policy",
-          text: "PG wala is built on community and respect. We strictly prohibit hosts or residents from discriminating against anyone based on race, religion, caste, national origin, language, gender, or marital status."
+          text: "PGhive is built on community and respect. We strictly prohibit hosts or residents from discriminating against anyone based on race, religion, caste, national origin, language, gender, or marital status."
         },
         {
           heading: "Listing Guidelines",
@@ -108,7 +108,7 @@ export default function InfoModal({ type, onClose }) {
         },
         {
           heading: "Reporting Violations",
-          text: "If you experience discrimination during your PG search or stay, please report it immediately to our support team at support@pgwala.com."
+          text: "If you experience discrimination during your PG search or stay, please report it immediately to our support team at support@pghive.com."
         }
       ]
     },
@@ -150,7 +150,7 @@ export default function InfoModal({ type, onClose }) {
         },
         {
           heading: "4. User Rights (GDPR & compliance)",
-          text: "You can request to export or delete your user record and listings at any time by contacting our privacy compliance desk at privacy@pgwala.com."
+          text: "You can request to export or delete your user record and listings at any time by contacting our privacy compliance desk at privacy@pghive.com."
         }
       ]
     },
@@ -176,7 +176,7 @@ export default function InfoModal({ type, onClose }) {
       sections: [
         {
           heading: "Corporate Identity",
-          text: "PG wala Community Directory Private Limited. CIN: U74999KA2026PTC123456."
+          text: "PGhive Community Directory Private Limited. CIN: U74999KA2026PTC123456."
         },
         {
           heading: "Registered Address",
@@ -184,7 +184,7 @@ export default function InfoModal({ type, onClose }) {
         },
         {
           heading: "Grievance Redressal",
-          text: "For legal, trademark, or user inquiries, reach out to grievance@pgwala.com."
+          text: "For legal, trademark, or user inquiries, reach out to grievance@pghive.com."
         }
       ]
     }
@@ -223,7 +223,7 @@ export default function InfoModal({ type, onClose }) {
 
           <div style={{ borderTop: '1px solid var(--colors-hairline-soft)', paddingTop: '16px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center', color: 'var(--colors-muted)' }}>
             <ShieldCheck size={16} style={{ color: 'var(--colors-success)' }} />
-            <span className="caption-sm">Verified PG wala Community Guild guidelines.</span>
+            <span className="caption-sm">Verified PGhive Community Guild guidelines.</span>
           </div>
 
         </div>

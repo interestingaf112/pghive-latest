@@ -3,11 +3,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     function isAdmin() {
-      return request.auth != null && 
-        (request.auth.token.email == 'admin@pgwala.com' ||
-         request.auth.token.email == 'abhinandshopify@gmail.com' ||
-         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true));
+      return request.auth != null && (
+        ('email' in request.auth.token && (
+          request.auth.token.email == 'admin@pghive.com' ||
+          request.auth.token.email == 'abhinandshopify@gmail.com'
+        )) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true)
+      );
+    }
+    
+    function isTestUser() {
+      return request.auth != null && 'email' in request.auth.token && (
+        request.auth.token.email == 'admin@pghive.com' ||
+        request.auth.token.email == 'abhinandshopify@gmail.com' ||
+        request.auth.token.email == 'amanmohdp53@gmail.com' ||
+        request.auth.token.email == 'abhinandsreejith12@gmail.com'
+      );
     }
     
     // Helper check if the user has unlocked this specific PG listing
@@ -23,7 +35,9 @@ service cloud.firestore {
         && data.address is string && data.address.size() > 0 && data.address.size() <= 500
         && data.description is string && data.description.size() > 0 && data.description.size() <= 2000
         && data.price is number && data.price > 0 && data.price <= 500000
-        && data.gender is string && (data.gender == 'boys' || data.gender == 'girls' || data.gender == 'unisex');
+        && data.gender is string && (data.gender == 'boys' || data.gender == 'girls' || data.gender == 'unisex')
+        && (!('lat' in data) || data.lat is number)
+        && (!('lng' in data) || data.lng is number);
     }
 
     // Validate User document structure
@@ -75,9 +89,9 @@ service cloud.firestore {
                       // The isAdmin field can only be set by the Admin SDK (server-side).
                       && (!('isAdmin' in request.resource.data) || request.resource.data.isAdmin == false)
                       && (
-                       // Creation rule: initialize with default credits (3), strict field allowlist
+                       // Creation rule: initialize with default credits (1), strict field allowlist
                        (resource == null 
-                        && request.resource.data.credits == 3 
+                        && (request.resource.data.credits == 1 || (isTestUser() && request.resource.data.credits == 10))
                         && request.resource.data.unlockedPGs.size() == 0
                         && request.resource.data.keys().hasOnly(['credits', 'unlockedPGs'])
                        )
@@ -85,8 +99,14 @@ service cloud.firestore {
                        // Update rule: enforce credit deduction matches growth of unlocked PG list.
                        // Credit increments are ONLY possible via Admin SDK (server-side Cloud Functions).
                        (resource != null 
-                        && request.resource.data.unlockedPGs.size() >= resource.data.unlockedPGs.size()
-                        && request.resource.data.credits == resource.data.credits - (request.resource.data.unlockedPGs.size() - resource.data.unlockedPGs.size())
+                        && (
+                          // Allow test users to freely reset their credits up to 10
+                          (isTestUser() && request.resource.data.credits <= 10 && request.resource.data.credits >= resource.data.get('credits', 0) && request.resource.data.unlockedPGs.size() == resource.data.get('unlockedPGs', []).size())
+                          ||
+                          // Normal credit deduction rule for unlocks
+                          (request.resource.data.unlockedPGs.size() >= resource.data.get('unlockedPGs', []).size()
+                           && request.resource.data.credits == resource.data.get('credits', 0) - (request.resource.data.unlockedPGs.size() - resource.data.get('unlockedPGs', []).size()))
+                        )
                        )
                      ))
                    );
@@ -109,6 +129,17 @@ service cloud.firestore {
       );
     }
     
+    // Centralized Unlock Logs
+    match /unlocks/{unlockId} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
+    // Centralized Purchase Logs (Written server-side, read by owner or admin)
+    match /purchases/{purchaseId} {
+      allow read: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
+    }
+
     // Block everything else
     match /{document=**} {
       allow read, write: if false;

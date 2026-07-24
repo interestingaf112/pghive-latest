@@ -11,7 +11,7 @@ export default class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('PG wala — Uncaught render error:', error, errorInfo);
+    console.error('PGhive — Uncaught render error:', error, errorInfo);
   }
 
   handleReload = () => {
@@ -45,7 +45,7 @@ export default class ErrorBoundary extends React.Component {
             fontSize: '28px', 
             marginBottom: '24px' 
           }}>
-            ⚠️
+            !
           </div>
           <h1 style={{ 
             fontFamily: "'Inter', sans-serif",
@@ -100,6 +100,7 @@ export default class ErrorBoundary extends React.Component {
           
           <details style={{ marginTop: '32px', textAlign: 'left', maxWidth: '500px', width: '100%', backgroundColor: 'var(--colors-surface-soft)', padding: '16px', borderRadius: '4px', border: '1px solid var(--colors-hairline)', fontSize: '12px', color: 'var(--colors-muted)', overflowX: 'auto', fontFamily: 'monospace' }}>
             <summary style={{ cursor: 'pointer', fontWeight: 700, marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Error Details (Developer info)</summary>
+            <h2 className="title-lg" style={{ color: 'var(--colors-ink)', marginBottom: '8px' }}>Something went wrong.</h2>
             <div style={{ fontWeight: 700, color: 'var(--colors-ink)', marginBottom: '4px' }}>{this.state.error?.toString()}</div>
             <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.4 }}>{this.state.error?.stack}</pre>
           </details>

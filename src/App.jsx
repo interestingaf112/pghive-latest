@@ -1,46 +1,41 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   fetchAllPGs, 
-  createPGListing, 
-  deletePGListing, 
-  updatePGListing,
-  getAdminPGContactDetails,
-  logoutAdminSession, 
   subscribeToAuth,
   isFirebaseActive,
   getUserCredits,
   getUnlockedPGIds,
   unlockPGContact,
-  addCredits,
   logoutTenantUser
 } from './firebase';
 import Header from './components/Header';
 import DecryptedText from './components/DecryptedText';
 import PGCard from './components/PGCard';
 import PGDetailsModal from './components/PGDetailsModal';
-import AdminDashboard from './components/AdminDashboard';
 import PurchaseModal from './components/PurchaseModal';
 import HelpCenterModal from './components/HelpCenterModal';
 import TermsModal from './components/TermsModal';
 import PrivacyModal from './components/PrivacyModal';
+import RefundModal from './components/RefundModal';
 import InfoModal from './components/InfoModal';
-import ListYourPGModal from './components/ListYourPGModal';
+
 import AuthModal from './components/AuthModal';
 import AccountCentreModal from './components/AccountCentreModal';
 import { Analytics } from '@vercel/analytics/react';
-import { useScrollReveal } from './hooks/useScrollReveal';
-import { Search, SlidersHorizontal, Home, Coins, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
-import { BANGALORE_LOCALITIES } from './utils/constants';
-
-const DEFAULT_LOCALITIES = BANGALORE_LOCALITIES;
+import { Search, SlidersHorizontal, Home, Coins, Globe, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { BANGALORE_LOCALITIES, CITIES } from './utils/constants';
 
 export default function App() {
   const [pgs, setPgs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [is404, setIs404] = useState(false);
+  const [selectedCity, setSelectedCity] = useState('bangalore');
+  
+  const currentCityConfig = CITIES[selectedCity] || CITIES.bangalore;
+  const currentCityLocalities = currentCityConfig.localities;
 
   // Scroll reveal observer
   const mainRef = useRef(null);
-  useScrollReveal(mainRef);
 
   const hubsGridRef = useRef(null);
 
@@ -51,22 +46,7 @@ export default function App() {
     }
   };
   
-  // Navigation State - lazy initialize from URL params
-  const [isAdminMode, setIsAdminMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const isAdmin = params.get('portal') === 'admin' || params.get('admin') === 'true';
-      if (isAdmin) {
-        setTimeout(() => {
-          const newUrl = window.location.pathname;
-          window.history.replaceState({}, document.title, newUrl);
-        }, 0);
-      }
-      return isAdmin;
-    }
-    return false;
-  });
-  const [adminUser, setAdminUser] = useState(null);
+
   
   // Modals
   const [selectedPG, setSelectedPG] = useState(null);
@@ -74,23 +54,33 @@ export default function App() {
   const [showHelpCenter, setShowHelpCenter] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showRefund, setShowRefund] = useState(false);
   const [infoModalType, setInfoModalType] = useState(null); // 'investors' | 'features' | 'discrimination' | 'disability'
   const [showListModal, setShowListModal] = useState(false);
 
   // Authentication Modals & Session States - lazy initialize session
   const [currentUser, setCurrentUser] = useState(() => {
-    if (typeof window !== 'undefined' && !isFirebaseActive) {
+    if (typeof window !== 'undefined') {
       const storedTenant = localStorage.getItem('tenant_session');
       if (storedTenant) {
         try {
           return JSON.parse(storedTenant);
         } catch (e) {
-          console.error("Error loading mock tenant session:", e);
+          console.error("Error loading tenant session:", e);
         }
       }
     }
     return null;
   });
+
+  // Sync Tenant User state to localStorage
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('tenant_session', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('tenant_session');
+    }
+  }, [currentUser]);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAccountCentre, setShowAccountCentre] = useState(false);
 
@@ -105,26 +95,23 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', 'light');
-    localStorage.setItem('pg_wala_theme', 'light');
+    localStorage.setItem('pg_hub_theme', 'light');
   }, []);
 
   const toggleTheme = () => {};
 
   // Lock body scroll when any modal is visible
   useEffect(() => {
-    const isLocked = !!selectedPG || showPurchaseModal || showHelpCenter || showTerms || showPrivacy || !!infoModalType || showListModal;
+    const isLocked = !!selectedPG || showPurchaseModal || showHelpCenter || showTerms || showPrivacy || showRefund || !!infoModalType || showListModal;
     if (isLocked) {
       document.body.style.overflow = 'hidden';
-      document.body.style.height = '100vh';
     } else {
       document.body.style.overflow = '';
-      document.body.style.height = '';
     }
     return () => {
       document.body.style.overflow = '';
-      document.body.style.height = '';
     };
-  }, [selectedPG, showPurchaseModal, showHelpCenter, showTerms, showPrivacy, infoModalType, showListModal]);
+  }, [selectedPG, showPurchaseModal, showHelpCenter, showTerms, showPrivacy, showRefund, infoModalType, showListModal]);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,6 +119,33 @@ export default function App() {
   const [selectedGender, setSelectedGender] = useState('all');
   const [selectedPriceRange, setSelectedPriceRange] = useState('all');
   const [rentValue, setRentValue] = useState(12000);
+
+  // AI Finder State
+  const [aiInputQuery, setAiInputQuery] = useState('');
+  const [aiResponse, setAiResponse] = useState('');
+  const [aiMatchingIds, setAiMatchingIds] = useState(null);
+  const [isAiSearching, setIsAiSearching] = useState(false);
+  const [aiError, setAiError] = useState('');
+  
+  // Cookie Consent State
+  const [cookieConsent, setCookieConsent] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pg_hub_cookie_consent') || 'pending';
+    }
+    return 'pending';
+  });
+
+  const handleAcceptCookies = () => {
+    localStorage.setItem('pg_hub_cookie_consent', 'accepted');
+    setCookieConsent('accepted');
+  };
+
+  const handleDenyCookies = () => {
+    localStorage.setItem('pg_hub_cookie_consent', 'denied');
+    setCookieConsent('denied');
+  };
+  
+
   
   // Filter chips for Amenities
   const [selectedAmenities, setSelectedAmenities] = useState({
@@ -144,6 +158,30 @@ export default function App() {
     security: false,
     parking: false
   });
+
+  const hasActiveFilters = 
+    searchQuery !== '' || 
+    selectedLocality !== 'all' || 
+    selectedGender !== 'all' || 
+    selectedPriceRange !== 'all' || 
+    Object.values(selectedAmenities).some(Boolean);
+
+  const handleClearAllFilters = () => {
+    setSearchQuery('');
+    setSelectedLocality('all');
+    setSelectedGender('all');
+    setSelectedPriceRange('all');
+    setSelectedAmenities({
+      wifi: false,
+      food: false,
+      ac: false,
+      gym: false,
+      laundry: false,
+      backup: false,
+      security: false,
+      parking: false
+    });
+  };
 
   // Toast notifications
   const [toasts, setToasts] = useState([]);
@@ -161,17 +199,16 @@ export default function App() {
   // Onboarding - lazy initialize
   const [showOnboarding, setShowOnboarding] = useState(() => {
     if (typeof window !== 'undefined') {
-      return !localStorage.getItem('pg_wala_onboarded');
+      return !localStorage.getItem('pg_hub_onboarded');
     }
     return false;
   });
   const [onboardingStep, setOnboardingStep] = useState(1);
 
   const closeOnboarding = () => {
-    localStorage.setItem('pg_wala_onboarded', 'true');
+    localStorage.setItem('pg_hub_onboarded', 'true');
     setShowOnboarding(false);
   };
-
   // Load PGs, Auth Status, and Credits on Mount
   useEffect(() => {
     async function loadData() {
@@ -192,19 +229,11 @@ export default function App() {
     }
     loadData();
 
-    // Subscribe to auth state updates
-    const adminEmail = import.meta.env?.VITE_ADMIN_USER;
+    // Subscribe to auth state updates for regular users
     const unsubscribe = subscribeToAuth((user) => {
       if (user) {
-        if (user.email === adminEmail || user.username === adminEmail || user.uid === 'local-admin') {
-          setAdminUser(user);
-          setCurrentUser(null);
-        } else {
-          setCurrentUser(user);
-          setAdminUser(null);
-        }
+        setCurrentUser(user);
       } else {
-        setAdminUser(null);
         if (isFirebaseActive) {
           setCurrentUser(null);
         }
@@ -215,39 +244,6 @@ export default function App() {
       unsubscribe();
     };
   }, []);
-
-  // Database handlers
-  const handleAddPG = async (pgData, imageFiles) => {
-    const newListing = await createPGListing(pgData, imageFiles);
-    const data = await fetchAllPGs();
-    setPgs(data);
-    return newListing;
-  };
-
-  const handleUpdatePG = async (pgId, pgData, imageFilesOrUrls) => {
-    const updatedListing = await updatePGListing(pgId, pgData, imageFilesOrUrls);
-    const data = await fetchAllPGs();
-    setPgs(data);
-    return updatedListing;
-  };
-
-  const handleDeletePG = async (pgId) => {
-    const confirmDelete = window.confirm("Are you sure you want to delete this PG listing?");
-    if (!confirmDelete) return;
-
-    try {
-      await deletePGListing(pgId);
-      const data = await fetchAllPGs();
-      setPgs(data);
-    } catch (err) {
-      showToast("Error deleting listing: " + err.message, "error");
-    }
-  };
-
-  const handleLogout = async () => {
-    await logoutAdminSession();
-    setIsAdminMode(false);
-  };
 
   // Sync credits and unlocked listings when the user session changes
   useEffect(() => {
@@ -268,6 +264,18 @@ export default function App() {
 
   const handleAuthSuccess = (user) => {
     setCurrentUser(user);
+    
+    // Clear any active admin session to prevent conflicts
+    setAdminUser(null);
+    setIsAdminMode(false);
+    localStorage.removeItem('admin_session');
+    localStorage.removeItem('admin_session_user');
+    localStorage.setItem('pg_hub_is_admin_mode', 'false');
+
+    if (user?.isNewUser) {
+      window.alert("🎉 Welcome to PG Hive! You've received 1 free credit as a signup bonus to unlock contacts.");
+      showToast("🎉 1 Free Credit added to your account!", "success");
+    }
   };
 
   const handleLogoutUser = async () => {
@@ -282,11 +290,6 @@ export default function App() {
   };
 
   const handleOpenPurchaseModal = () => {
-    if (!currentUser) {
-      showToast("Please sign in or create an account to buy credits.", "info");
-      setShowAuthModal(true);
-      return;
-    }
     setShowPurchaseModal(true);
   };
 
@@ -324,26 +327,19 @@ export default function App() {
         "You have 0 credits remaining! Would you like to buy a contact views package?"
       );
       if (buyCredits) {
-        if (!currentUser) {
-          showToast("Please sign in or create an account to buy credits.", "info");
-          setShowAuthModal(true);
-        } else {
-          setShowPurchaseModal(true);
-        }
+        setShowPurchaseModal(true);
       }
     }
   };
 
   // Purchase handler — uses service-layer addCredits
-  const handlePurchaseSuccess = async (purchasedCredits) => {
+  const handlePurchaseSuccess = async () => {
     try {
-      await addCredits(purchasedCredits);
-      // Refresh credits from service layer
+      // Refresh credits from service layer (backend already added them securely)
       const newBalance = await getUserCredits();
       setUserCredits(newBalance);
     } catch (err) {
-      console.error("Error adding credits:", err);
-      showToast("Failed to add credits. Please try again.", "error");
+      console.error("Error refreshing credits:", err);
     }
   };
 
@@ -401,15 +397,66 @@ export default function App() {
     }
   };
 
+  const handleAiSearch = async (e) => {
+    e.preventDefault();
+    if (!aiInputQuery.trim()) return;
+
+    setIsAiSearching(true);
+    setAiError('');
+    setAiResponse('');
+    setAiMatchingIds(null);
+
+    try {
+      const res = await fetch('/api/ai-search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query: aiInputQuery })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to search using AI.');
+      }
+
+      setAiResponse(data.response);
+      setAiMatchingIds(data.matchingIds || []);
+    } catch (err) {
+      console.error("AI Search Failed:", err);
+      setAiError(err.message);
+    } finally {
+      setIsAiSearching(false);
+    }
+  };
+
+  const handleResetAiSearch = () => {
+    setAiInputQuery('');
+    setAiResponse('');
+    setAiMatchingIds(null);
+    setAiError('');
+  };
+
+  const parseSimpleMarkdown = (text) => {
+    if (!text) return '';
+    let html = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    html = html.replace(/^- (.*?)$/gm, '• $1');
+    return html;
+  };
+
   // Client-side SEO URL router mount & popstate handler
   useEffect(() => {
     const handleLocationChange = () => {
       // 1. Locality routing
       const path = window.location.pathname;
       const match = path.match(/^\/pg-in-([a-zA-Z0-9-]+)$/i);
+      let validRoute = false;
+
       if (match) {
+        validRoute = true;
         const slug = match[1];
-        const found = [...DEFAULT_LOCALITIES, ...pgs.map(p => p.locality)].find(
+        const found = [...currentCityLocalities, ...pgs.map(p => p.locality)].find(
           loc => getLocalitySlug(loc) === slug
         );
         if (found) {
@@ -418,9 +465,12 @@ export default function App() {
           const formatted = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
           setSelectedLocality(formatted);
         }
-      } else if (path === '/' || path === '') {
+      } else if (path === '/' || path === '' || path === '/index.html') {
+        validRoute = true;
         setSelectedLocality('all');
       }
+
+      setIs404(!validRoute);
 
       // 2. Deep linking check for ?pg=pgId
       const params = new URLSearchParams(window.location.search);
@@ -451,11 +501,11 @@ export default function App() {
   useEffect(() => {
     if (selectedPG) {
       // Dynamic Title
-      document.title = `${selectedPG.name} | PG in ${selectedPG.locality} - PG wala`;
+      document.title = `${selectedPG.name} | PG in ${selectedPG.locality} - PGhive`;
       const metaDesc = document.querySelector('meta[name="description"]');
       if (metaDesc) {
         const amenitiesStr = selectedPG.amenities ? Object.keys(selectedPG.amenities).filter(k => selectedPG.amenities[k]).join(', ') : '';
-        metaDesc.setAttribute('content', `Explore ${selectedPG.name} co-living in ${selectedPG.locality}, Bangalore. Preferred for: ${selectedPG.preferredGender}. Key amenities: ${amenitiesStr}. Rent starts at ₹${selectedPG.price}/month. Zero brokerage on PG wala.`);
+        metaDesc.setAttribute('content', `Explore ${selectedPG.name} co-living in ${selectedPG.locality}, Bangalore. Preferred for: ${selectedPG.preferredGender}. Key amenities: ${amenitiesStr}. Rent starts at ₹${selectedPG.price}/month. Zero brokerage on PGhive.`);
       }
 
       // Dynamic JSON-LD Schema
@@ -496,16 +546,16 @@ export default function App() {
       return () => {
         // Revert title & description to locality level
         if (selectedLocality === 'all') {
-          document.title = 'PG wala | Premium Paying Guest Accommodations in Bangalore';
+          document.title = `PGhive | Premium Paying Guest Accommodations in ${currentCityConfig.name}`;
           const metaDescDefault = document.querySelector('meta[name="description"]');
           if (metaDescDefault) {
-            metaDescDefault.setAttribute('content', 'Find the best Paying Guest (PG) accommodations in Bangalore with PG wala. Filter by locality, price, amenities, and gender preferences. Zero brokerage — contact owners directly.');
+            metaDescDefault.setAttribute('content', `Find the best Paying Guest (PG) accommodations in ${currentCityConfig.name} with PGhive. Filter by locality, price, amenities, and gender preferences. Zero brokerage — contact owners directly.`);
           }
         } else {
-          document.title = `PG in ${selectedLocality} | Zero Brokerage PG accommodations on PG wala`;
+          document.title = `PG in ${selectedLocality} | Zero Brokerage PG accommodations on PGhive`;
           const metaDescLoc = document.querySelector('meta[name="description"]');
           if (metaDescLoc) {
-            metaDescLoc.setAttribute('content', `Find the best Paying Guest (PG) accommodations in ${selectedLocality}, Bangalore. Filter by price, amenities, and gender. Zero brokerage — contact owners directly on PG wala.`);
+            metaDescLoc.setAttribute('content', `Find the best Paying Guest (PG) accommodations in ${selectedLocality}, ${currentCityConfig.name}. Filter by price, amenities, and gender. Zero brokerage — contact owners directly on PGhive.`);
           }
         }
 
@@ -513,13 +563,19 @@ export default function App() {
         if (activeSchema) activeSchema.remove();
       };
     }
-  }, [selectedPG, selectedLocality]);
+  }, [selectedPG, selectedLocality, selectedCity]);
 
   // Unique localities present in PG listings (for dropdown filters)
-  const availableLocalities = ['all', ...new Set([...DEFAULT_LOCALITIES, ...pgs.map(pg => pg.locality)])];
+  const availableLocalities = ['all', ...new Set([...currentCityLocalities, ...pgs.map(pg => pg.locality)])];
 
   // Filtering Logic
-  const filteredPGs = pgs.filter(pg => {
+  const rawFilteredPGs = pgs.filter(pg => {
+    // 0. City filter
+    const pgCity = pg.city || 'bangalore';
+    if (pgCity !== selectedCity) {
+      return false;
+    }
+
     // 1. Text Search query (match name, locality, address, description)
     const text = `${pg.name} ${pg.locality} ${pg.address} ${pg.description}`.toLowerCase();
     if (searchQuery && !text.includes(searchQuery.toLowerCase())) {
@@ -551,7 +607,19 @@ export default function App() {
       }
     }
 
+    // 6. AI Match Filter (if search is active)
+    if (aiMatchingIds !== null && !aiMatchingIds.includes(pg.id)) {
+      return false;
+    }
+
     return true;
+  });
+
+  // Sort: Featured ads (isFeatured: true) stay on top
+  const filteredPGs = [...rawFilteredPGs].sort((a, b) => {
+    const aFeatured = a.isFeatured === true ? 1 : 0;
+    const bFeatured = b.isFeatured === true ? 1 : 0;
+    return bFeatured - aFeatured;
   });
 
   // Inject/update main directory list schema (ItemList) - Declared after filteredPGs is initialized
@@ -563,14 +631,14 @@ export default function App() {
       const itemListElement = filteredPGs.map((pg, index) => ({
         "@type": "ListItem",
         "position": index + 1,
-        "url": `https://pgwala.vercel.app/?pg=${pg.id}`,
+        "url": `https://pghive-app.vercel.app/?pg=${pg.id}`,
         "name": pg.name
       }));
 
       const schemaData = {
         "@context": "https://schema.org",
         "@type": "ItemList",
-        "name": selectedLocality === 'all' ? "Paying Guest listings in Bangalore" : `Paying Guest listings in ${selectedLocality}, Bangalore`,
+        "name": selectedLocality === 'all' ? `Paying Guest listings in ${currentCityConfig.name}` : `Paying Guest listings in ${selectedLocality}, ${currentCityConfig.name}`,
         "numberOfItems": filteredPGs.length,
         "itemListElement": itemListElement
       };
@@ -586,20 +654,17 @@ export default function App() {
       const activeListSchema = document.getElementById('directory-list-schema');
       if (activeListSchema) activeListSchema.remove();
     };
-  }, [filteredPGs, selectedLocality]);
+  }, [filteredPGs, selectedLocality, selectedCity]);
 
   return (
     <>
       {/* Clean Minimalist Background Grid */}
       <div className="animated-bg-blobs">
-        <div className="bg-grid-overlay"></div>
       </div>
 
       <Header 
-        isAdminMode={isAdminMode} 
-        setIsAdminMode={setIsAdminMode} 
-        adminUser={adminUser}
-        onLogout={handleLogout}
+        isAdminMode={false} 
+        adminUser={null}
         userCredits={userCredits}
         onOpenPurchaseModal={handleOpenPurchaseModal}
         theme={theme}
@@ -609,25 +674,33 @@ export default function App() {
           console.log("onOpenAuthModal called in App.jsx, setting showAuthModal to true");
           setShowAuthModal(true);
         }}
-        onLogoutUser={handleLogoutUser}
+        onLogout={handleLogoutUser}
         onOpenAccountCentre={() => setShowAccountCentre(true)}
+        onAuthSuccess={handleAuthSuccess}
       />
 
       <main style={{ flexGrow: 1, position: 'relative', zIndex: 1 }} className="app-main-content">
-        {isAdminMode ? (
+        {is404 ? (
           // ==========================================
-          // ADMIN PORTAL VIEW
+          // 404 PAGE NOT FOUND
           // ==========================================
-          <AdminDashboard 
-            adminUser={adminUser}
-            onLoginSuccess={(user) => setAdminUser(user)}
-            pgs={pgs}
-            onAddPG={handleAddPG}
-            onUpdatePG={handleUpdatePG}
-            getAdminPGContactDetails={getAdminPGContactDetails}
-            onDeletePG={handleDeletePG}
-            isFirebaseActive={isFirebaseActive}
-          />
+          <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 24px', textAlign: 'center', minHeight: '60vh' }}>
+            <h1 style={{ fontSize: '96px', fontWeight: 800, margin: 0, background: 'linear-gradient(135deg, var(--colors-primary) 0%, #2563eb 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', lineHeight: 1.1 }}>404</h1>
+            <h2 className="title-lg" style={{ margin: '24px 0 12px 0', fontSize: '26px', fontWeight: 800 }}>Lost in Bangalore Traffic?</h2>
+            <p className="body-md" style={{ color: 'var(--colors-muted)', maxWidth: '520px', margin: '0 auto 32px auto', lineHeight: 1.6, fontSize: '15px' }}>
+              The page you are looking for has either been relocated, demolished, or is currently stuck in the Silk Board underpass. Let's get you back to safety.
+            </p>
+            <button 
+              className="btn btn-primary animate-hover" 
+              onClick={() => {
+                window.history.pushState({}, '', '/');
+                window.dispatchEvent(new Event('popstate'));
+              }}
+              style={{ width: 'auto', padding: '12px 36px', minHeight: '44px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: 600 }}
+            >
+              Go Back Home
+            </button>
+          </div>
         ) : (
           // ==========================================
           // MAIN MARKETPLACE CATALOG VIEW
@@ -635,33 +708,26 @@ export default function App() {
           <div>
             {/* Split Premium Hero Banner */}
             <section className="campaign-hero">
-              {/* Premium Background Animations Container */}
-              <div className="hero-animations-container">
-                <div className="hero-blob blob-1"></div>
-                <div className="hero-blob blob-2"></div>
-                <div className="hero-blob blob-3"></div>
-                <div className="hero-grid-overlay"></div>
-              </div>
               <div className="container" style={{ width: '100%' }}>
-                <div className="hero-split-layout">
-                  {/* Left Column: Context, Search */}
-                  <div className="hero-left scroll-reveal">
-                    <span className="hero-tagline">✨ Zero Brokerage Co-living</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '800px', margin: '0 auto', gap: '24px' }}>
+                  {/* Centered Hero Content */}
+                  <div className="hero-left " style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: '24px', width: '100%' }}>
+                    <span className="hero-tagline" style={{ margin: '0 auto' }}>Zero Brokerage Co-living</span>
                     {selectedLocality === 'all' ? (
-                      <h1 className="hero-main-title" style={{ margin: 0 }}>
-                        <DecryptedText text="Zero brokerage — contact owners directly" animateOn="view" useOriginalCharsOnly />
+                      <h1 className="hero-main-title animate-fade-in-up" style={{ margin: 0, textAlign: 'center' }}>
+                        Zero brokerage — contact owners directly
                       </h1>
                     ) : (
-                      <h1 className="hero-main-title" style={{ margin: 0 }}>
+                      <h1 className="hero-main-title" style={{ margin: 0, textAlign: 'center' }}>
                         <DecryptedText text={`PGs in ${selectedLocality}`} animateOn="view" useOriginalCharsOnly />
                       </h1>
                     )}
-                    <p className="campaign-hero-subtitle body-md" style={{ textAlign: 'left', maxWidth: '540px', margin: 0 }}>
+                    <p className="campaign-hero-subtitle body-md" style={{ textAlign: 'center', maxWidth: '640px', margin: '0 auto' }}>
                       Join Bangalore's largest co-living community with <strong>{pgs.length} verified listings</strong>. Skip broker calls. Unlock verified PG accommodations and chat directly with owners. Verified amenities, single/sharing options, and transparent pricing.
                     </p>
                     
                     {/* Hero Action Buttons */}
-                    <div style={{ marginTop: '16px', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ marginTop: '8px', display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
                       <button 
                         className="btn btn-primary"
                         onClick={() => {
@@ -672,17 +738,10 @@ export default function App() {
                       >
                         Explore PGs
                       </button>
-                      <button 
-                        className="btn btn-secondary"
-                        onClick={() => setShowListModal(true)}
-                        style={{ width: 'auto', padding: '10px 24px', borderWidth: '1.5px', borderColor: 'var(--colors-ink)', fontWeight: 700 }}
-                      >
-                        List your PG free
-                      </button>
                     </div>
                     
                     {/* Segmented Global Search Bar */}
-                    <div className="search-bar-pill" style={{ width: '100%', marginTop: '8px' }}>
+                    <div className="search-bar-pill" style={{ width: '100%', marginTop: '16px' }}>
                       <div className="search-field-segment">
                         <span className="caption">Where</span>
                         <input 
@@ -741,95 +800,17 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-
-                  {/* Right Column: Premium Brokerage Savings Calculator Widget */}
-                  <div className="hero-right scroll-reveal" style={{ '--reveal-delay': '1' }}>
-                    <div className="savings-calc-card">
-                      <div className="calc-header">
-                        <span className="calc-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Coins size={12} /> Zero-Brokerage Savings
-                        </span>
-                        <h3 className="calc-title" style={{ margin: 0 }}>Brokerage Calculator</h3>
-                      </div>
-                      
-                      <div className="calc-body-redesign">
-                        <div className="calc-slider-group">
-                          <div className="slider-label-row">
-                            <span className="slider-title">Monthly Rent Target</span>
-                            <span className="slider-value">₹{rentValue.toLocaleString('en-IN')}</span>
-                          </div>
-                          <input 
-                            type="range" 
-                            min="5000" 
-                            max="30000" 
-                            step="1000" 
-                            value={rentValue} 
-                            onChange={(e) => setRentValue(Number(e.target.value))}
-                            className="calc-range-slider"
-                            style={{ '--slider-progress': `${((rentValue - 5000) / 25000) * 100}%` }}
-                          />
-                          <div className="slider-ticks">
-                            <span>₹5,000</span>
-                            <span>₹15,000</span>
-                            <span>₹30,000</span>
-                          </div>
-                        </div>
-
-                        <div className="comparison-bars-container">
-                          <div className="comparison-bar-item broker-loss">
-                            <div className="bar-label-row">
-                              <span className="bar-name">Broker Agent Fee</span>
-                              <span className="bar-cost">₹{rentValue.toLocaleString('en-IN')}</span>
-                            </div>
-                            <div className="bar-track">
-                              <div className="bar-fill red-fill" style={{ width: '100%' }}></div>
-                            </div>
-                          </div>
-
-                          <div className="comparison-bar-item pgwala-win">
-                            <div className="bar-label-row">
-                              <span className="bar-name">PG wala Fee</span>
-                              <span className="bar-cost">₹49</span>
-                            </div>
-                            <div className="bar-track">
-                              <div className="bar-fill green-fill" style={{ width: `${(49 / rentValue) * 100}%`, minWidth: '4px' }}></div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="savings-summary-banner">
-                          <div className="summary-left">
-                            <span className="summary-title">TOTAL SAVINGS</span>
-                            <span className="summary-amount">₹{(rentValue - 49).toLocaleString('en-IN')}</span>
-                          </div>
-                          <div className="summary-right">
-                            <span className="savings-badge-pill">99.6% Saved</span>
-                            <span className="savings-multiplier">{Math.round(rentValue / 49)}x Cheaper</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <button 
-                        className="btn btn-primary animate-pulse" 
-                        onClick={() => {
-                          const gridEl = document.getElementById('catalog-grid');
-                          gridEl?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        style={{ width: '100%', marginTop: '8px' }}
-                      >
-                        Find Rooms & Save Now
-                      </button>
-                    </div>
-                  </div>
                 </div>
               </div>
             </section>
+
+
 
             {/* Main Marketplace catalog grid */}
             <div className="container section-gap" id="catalog-grid" style={{ width: '100%' }}>
               
               {/* Sticky Filter Bar */}
-              <div className="sticky-filter-bar scroll-reveal" style={{ 
+              <div className="sticky-filter-bar " style={{ 
                 position: 'sticky', 
                 top: '72px', 
                 zIndex: 200, 
@@ -845,17 +826,36 @@ export default function App() {
                 flexWrap: 'wrap',
                 gap: '16px'
               }}>
-                {/* Search field input */}
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 250px' }}>
-                  <Search size={14} style={{ position: 'absolute', left: '12px', color: 'var(--colors-muted)' }} />
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="Search by keywords (single room, wifi...)"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ paddingLeft: '34px', borderRadius: 'var(--rounded-full)', height: '36px', fontSize: '12px', marginBottom: 0 }}
-                  />
+                {/* City and search inputs layout */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', flex: '1 1 350px', gap: '8px' }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '0 16px',
+                    borderRadius: 'var(--rounded-full)',
+                    backgroundColor: 'var(--colors-surface-soft)',
+                    border: '1px solid var(--colors-hairline)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: 'var(--colors-primary)',
+                    height: '36px',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    📍 Bangalore
+                  </div>
+
+                  <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '12px', color: 'var(--colors-muted)' }} />
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder={`Search properties in ${currentCityConfig.name}...`}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{ paddingLeft: '34px', borderRadius: 'var(--rounded-full)', height: '36px', fontSize: '12px', marginBottom: 0, width: '100%' }}
+                    />
+                  </div>
                 </div>
 
                 {/* Desktop-only selectors */}
@@ -907,7 +907,7 @@ export default function App() {
               </div>
 
               {/* Quick Filter Chips (Instantly updates states) */}
-              <div className="quick-filter-chips scroll-reveal" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '32px' }}>
+              <div className="quick-filter-chips " style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '32px' }}>
                 <button 
                   className={`filter-chip ${selectedPriceRange === 'under-10000' ? 'active' : ''}`}
                   onClick={() => setSelectedPriceRange(prev => prev === 'under-10000' ? 'all' : 'under-10000')}
@@ -938,15 +938,36 @@ export default function App() {
                 >
                   ₹10k - ₹15k
                 </button>
+                {hasActiveFilters && (
+                  <button 
+                    className="filter-chip"
+                    onClick={handleClearAllFilters}
+                    style={{
+                      backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                      borderColor: 'rgba(239, 68, 68, 0.3)',
+                      color: 'rgb(239, 68, 68)',
+                      fontWeight: 700,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <RotateCcw size={11} />
+                    <span>Clear Filters</span>
+                  </button>
+                )}
               </div>
 
               {/* Grid Header */}
-              <div className="scroll-reveal" style={{ borderBottom: '1px solid var(--colors-hairline-soft)', paddingBottom: '16px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', width: '100%' }}>
-                <h2 className="display-sm" style={{ fontSize: '20px', fontWeight: 600 }}>Bangalore catalog</h2>
-                <span className="body-sm">{filteredPGs.length} options</span>
+              <div className="" style={{ borderBottom: '1px solid var(--colors-hairline-soft)', paddingBottom: '16px', marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
+                  <h2 className="display-sm" style={{ fontSize: '20px', fontWeight: 600 }}>{currentCityConfig.name} catalog</h2>
+                  <span className="body-sm">{filteredPGs.length} options</span>
+                </div>
               </div>
 
-              {/* Catalog Grid */}
+              {/* Catalog Grid or Map */}
               {loading ? (
                 <div className="pg-grid" style={{ width: '100%' }}>
                   {Array.from({ length: 8 }).map((_, idx) => (
@@ -962,10 +983,12 @@ export default function App() {
                   ))}
                 </div>
               ) : filteredPGs.length === 0 ? (
-                <div className="empty-state scroll-reveal" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', border: '1.5px dashed var(--colors-hairline)', borderRadius: '12px', background: 'var(--colors-surface-soft)' }}>
-                  <h3 className="title-md" style={{ margin: 0 }}>No listings match your search</h3>
-                  <p className="body-sm" style={{ color: 'var(--colors-muted)', margin: '8px 0 20px 0', maxWidth: '400px', textAlign: 'center' }}>
-                    Try resetting filters or search in a different locality. If you own a PG in this area, be the first to list it!
+                <div className="empty-state " style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', border: '1.5px dashed var(--colors-hairline)', borderRadius: '12px', background: 'var(--colors-surface-soft)' }}>
+                  <h3 className="title-md" style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>No matches (The landlord is checking your birth chart)</span>
+                  </h3>
+                  <p className="body-sm" style={{ color: 'var(--colors-muted)', margin: '12px 0 20px 0', maxWidth: '480px', textAlign: 'center', lineHeight: 1.6 }}>
+                    We couldn't find any rooms matching these exact filters. Either the host is still auditing your salary slips and family history, or the listings are stuck in Silk Board traffic. Try resetting your filters to find a match!
                   </p>
                   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button 
@@ -985,6 +1008,7 @@ export default function App() {
                           security: false,
                           parking: false
                         });
+                        handleResetAiSearch();
                         const gridEl = document.getElementById('catalog-grid');
                         gridEl?.scrollIntoView({ behavior: 'smooth' });
                       }}
@@ -992,19 +1016,12 @@ export default function App() {
                     >
                       Reset All Filters
                     </button>
-                    <button 
-                      className="btn btn-primary" 
-                      onClick={() => setShowListModal(true)}
-                      style={{ width: 'auto', padding: '8px 18px', minHeight: '34px' }}
-                    >
-                      List your PG free
-                    </button>
                   </div>
                 </div>
               ) : (
                 <div className="pg-grid" style={{ width: '100%' }}>
                   {filteredPGs.map((pg, index) => (
-                    <div key={pg.id} className="scroll-reveal" style={{ '--reveal-delay': index % 8 }}>
+                    <div key={pg.id} className="" style={{ '--reveal-delay': index % 8 }}>
                       <PGCard 
                         pg={pg} 
                         isUnlocked={unlockedPGIds.includes(pg.id)}
@@ -1019,7 +1036,7 @@ export default function App() {
             {/* Explore Hubs Section */}
             <section className="hubs-section container" style={{ width: '100%', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '28px' }}>
-                <div className="scroll-reveal" style={{ textAlign: 'left' }}>
+                <div className="" style={{ textAlign: 'left' }}>
                   <h3 className="section-title" style={{ margin: 0 }}>Explore Bangalore's top co-living hubs</h3>
                   <p className="body-sm" style={{ color: 'var(--colors-muted)', margin: '4px 0 0 0' }}>Quick filter by Bangalore's most popular professional neighborhoods</p>
                 </div>
@@ -1057,7 +1074,7 @@ export default function App() {
                   return (
                     <div 
                       key={hub.id} 
-                      className={`hub-card scroll-reveal ${index === 0 ? 'featured' : ''}`} 
+                      className={`hub-card ${index === 0 ? 'featured' : ''}`} 
                       onClick={() => {
                         handleLocalityChange(hub.id);
                         const gridEl = document.getElementById('catalog-grid');
@@ -1081,7 +1098,7 @@ export default function App() {
             </section>
             {/* How It Works Step Guide */}
             <section className="how-it-works container" style={{ width: '100%' }}>
-              <div className="scroll-reveal" style={{ textAlign: 'center', marginBottom: '48px' }}>
+              <div className="" style={{ textAlign: 'center', marginBottom: '48px' }}>
                 <h3 className="section-title" style={{ margin: 0 }}>Rent directly in 3 simple steps</h3>
                 <p className="body-md" style={{ color: 'var(--colors-muted)', maxWidth: '500px', margin: '8px auto 0' }}>
                   No middleman agents, no hidden commissions. Just clean, transparent direct-to-host bookings.
@@ -1089,17 +1106,17 @@ export default function App() {
               </div>
 
               <div className="steps-grid">
-                <div className="step-card scroll-reveal" style={{ '--reveal-delay': '0' }}>
+                <div className="step-card " style={{ '--reveal-delay': '0' }}>
                   <div className="step-icon-number">1</div>
                   <h4 className="step-title" style={{ margin: '0 0 8px 0' }}>Select Your Space</h4>
-                  <p className="step-text">Browse fully-managed co-living rooms in Bangalore's premier hubs. Filter by price, sharing, gender, and ratings.</p>
+                  <p className="step-text">Browse fully-managed co-living rooms in Bangalore's premier hubs. Filter by price, sharing, and gender.</p>
                 </div>
-                <div className="step-card scroll-reveal" style={{ '--reveal-delay': '1' }}>
+                <div className="step-card " style={{ '--reveal-delay': '1' }}>
                   <div className="step-icon-number">2</div>
                   <h4 className="step-title" style={{ margin: '0 0 8px 0' }}>Unlock Host Contacts</h4>
                   <p className="step-text">Pay a nominal 1 credit (₹49) to unlock the owner's WhatsApp and phone number. Save thousands in brokerage.</p>
                 </div>
-                <div className="step-card scroll-reveal" style={{ '--reveal-delay': '2' }}>
+                <div className="step-card " style={{ '--reveal-delay': '2' }}>
                   <div className="step-icon-number">3</div>
                   <h4 className="step-title" style={{ margin: '0 0 8px 0' }}>Coordinate & Move In</h4>
                   <p className="step-text">Chat directly with the owner, inspect the property, and sign the rental agreement on your terms. Zero middleman fees.</p>
@@ -1107,59 +1124,70 @@ export default function App() {
               </div>
             </section>
             
-            {/* About Us Premium Section */}
-            <section id="about-section" className="about-us-section container section-gap" style={{ width: '100%', borderTop: '1px solid var(--colors-hairline)', paddingTop: '64px' }}>
-              <div className="hero-split-layout" style={{ gap: '32px' }}>
-                <div className="scroll-reveal" style={{ textAlign: 'left' }}>
-                  <span className="hero-tagline" style={{ display: 'inline-block', marginBottom: '16px' }}>🔑 About PG wala</span>
-                  <h3 className="section-title" style={{ margin: '0 0 16px 0', fontSize: '32px', lineHeight: 1.2 }}>
-                    Simplifying co-living in Bangalore <span className="text-highlight">without the broker fee</span>
+            {/* Company Profile Premium Section */}
+            <section id="about-section" className="about-us-section container section-gap" style={{ width: '100%', borderTop: '1px solid var(--colors-hairline)', paddingTop: '64px', paddingBottom: '32px' }}>
+              <div className="hero-split-layout" style={{ gap: '48px', marginBottom: '48px' }}>
+                <div className="" style={{ textAlign: 'left' }}>
+                  <span className="hero-tagline" style={{ display: 'inline-block', marginBottom: '16px' }}>PGhive Company Profile</span>
+                  <h3 className="section-title" style={{ margin: '0 0 16px 0', fontSize: '36px', lineHeight: 1.2, fontWeight: 800 }}>
+                    Democratizing co-living in Bangalore <span className="text-highlight">without the broker fee</span>
                   </h3>
-                  <p className="body-md" style={{ color: 'var(--colors-body)', lineHeight: 1.7, marginBottom: '16px' }}>
-                    Finding a comfortable, managed room in Bangalore shouldn't cost you an arm and a leg. Traditional platforms force you to talk to brokers who charge up to a full month's rent as a commission fee for simply sharing a phone number.
+                  <p className="body-md" style={{ color: 'var(--colors-body)', lineHeight: 1.7, marginBottom: '16px', fontSize: '15px' }}>
+                    Finding a comfortable, managed Paying Guest (PG) room in Bangalore shouldn't cost you an arm and a leg. Traditional platforms are saturated with brokers charging up to a full month's rent (₹10,000 to ₹30,000) as commission just for sharing a landlord's phone number.
                   </p>
-                  <p className="body-md" style={{ color: 'var(--colors-body)', lineHeight: 1.7 }}>
-                    <strong>PG wala</strong> was founded to disrupt this outdated system. We connect paying guests directly with property owners and hosts. By checking verification certificates, managing amenities details, and offering direct chat routes, we make co-living secure, simple, and entirely brokerage-free.
+                  <p className="body-md" style={{ color: 'var(--colors-body)', lineHeight: 1.7, fontSize: '15px' }}>
+                    <strong>PGhive</strong> was founded to disrupt this outdated system. We connect paying guests directly with verified property hosts. By automating check lists, enforcing strict verification steps, and offering direct chat routes, we make co-living secure, simple, and entirely brokerage-free.
                   </p>
                 </div>
 
-                <div className="scroll-reveal" style={{ display: 'flex', flexDirection: 'column', gap: '16px', '--reveal-delay': '1' }}>
+                <div className="" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '20px', '--reveal-delay': '1' }}>
+                  {/* Visual Stats Row */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    <div style={{ padding: '24px', backgroundColor: 'var(--colors-surface-soft)', border: '1px solid var(--colors-hairline)', borderRadius: '12px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--colors-primary)' }}>₹0</div>
+                      <div style={{ fontSize: '12px', color: 'var(--colors-muted)', marginTop: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Brokerage Fees</div>
+                    </div>
+                    <div style={{ padding: '24px', backgroundColor: 'var(--colors-surface-soft)', border: '1px solid var(--colors-hairline)', borderRadius: '12px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '32px', fontWeight: 800, color: 'var(--colors-primary)' }}>100%</div>
+                      <div style={{ fontSize: '12px', color: 'var(--colors-muted)', marginTop: '4px', textTransform: 'uppercase', fontWeight: 600 }}>Verified Hosts</div>
+                    </div>
+                  </div>
+                  
                   <div style={{ 
                     backgroundColor: 'var(--colors-surface-card)', 
                     border: '1px solid var(--colors-hairline)', 
                     borderRadius: 'var(--rounded-md)',
-                    padding: '20px',
+                    padding: '24px',
                     boxShadow: 'var(--shadow-sm)'
                   }}>
-                    <h4 style={{ margin: '0 0 6px 0', color: 'var(--colors-primary)', fontWeight: 700, fontSize: '16px' }}>🚫 Zero Brokerage, Period</h4>
-                    <p className="body-sm" style={{ margin: 0, color: 'var(--colors-muted)', lineHeight: 1.5 }}>
-                      We do not charge commissions, processing fees, or hidden charges. Pay host contacts directly and save thousands.
+                    <h4 style={{ margin: '0 0 6px 0', color: 'var(--colors-primary)', fontWeight: 700, fontSize: '16px' }}>Our Mission</h4>
+                    <p className="body-sm" style={{ margin: 0, color: 'var(--colors-muted)', lineHeight: 1.6 }}>
+                      To build India's most transparent direct-to-owner rental ecosystem, letting students and young professionals find rooms efficiently, affordably, and safely.
                     </p>
                   </div>
+                </div>
+              </div>
 
-                  <div style={{ 
-                    backgroundColor: 'var(--colors-surface-card)', 
-                    border: '1px solid var(--colors-hairline)', 
-                    borderRadius: 'var(--rounded-md)',
-                    padding: '20px',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}>
-                    <h4 style={{ margin: '0 0 6px 0', color: 'var(--colors-primary)', fontWeight: 700, fontSize: '16px' }}>🛡️ 100% Verified Hosts</h4>
-                    <p className="body-sm" style={{ margin: 0, color: 'var(--colors-muted)', lineHeight: 1.5 }}>
-                      Every PG listed on our marketplace has undergone a direct checklist audit to confirm rooms, furnishing, amenities, and security.
+              {/* Core Business Values Grid */}
+              <div className="" style={{ textAlign: 'left', marginTop: '32px' }}>
+                <h4 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '24px', color: 'var(--colors-ink)' }}>Our Operational Values</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px' }}>
+                  <div style={{ padding: '24px', backgroundColor: 'var(--colors-surface-card)', border: '1px solid var(--colors-hairline)', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                    <h5 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 700, color: 'var(--colors-ink)' }}>🔒 Tamper-Proof Verification</h5>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--colors-muted)', lineHeight: 1.6 }}>
+                      Every host must pass mobile and email checks, and listing photos undergo digital anti-spam checks to eliminate duplicate listings.
                     </p>
                   </div>
-
-                  <div style={{ 
-                    backgroundColor: 'var(--colors-surface-card)', 
-                    border: '1px solid var(--colors-hairline)', 
-                    borderRadius: 'var(--rounded-md)',
-                    padding: '20px',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}>
-                    <h4 style={{ margin: '0 0 6px 0', color: 'var(--colors-primary)', fontWeight: 700, fontSize: '16px' }}>💬 Direct Owner Connection</h4>
-                    <p className="body-sm" style={{ margin: 0, color: 'var(--colors-muted)', lineHeight: 1.5 }}>
-                      Unlock phone numbers or chat on WhatsApp to coordinate virtual or physical site visits immediately.
+                  <div style={{ padding: '24px', backgroundColor: 'var(--colors-surface-card)', border: '1px solid var(--colors-hairline)', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                    <h5 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 700, color: 'var(--colors-ink)' }}>⚡ Microtransaction Model</h5>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--colors-muted)', lineHeight: 1.6 }}>
+                      We do not charge heavy subscription fees. Users only pay tiny, flat fees (as low as ₹49) to unlock specific contact info, keeping access democratic.
+                    </p>
+                  </div>
+                  <div style={{ padding: '24px', backgroundColor: 'var(--colors-surface-card)', border: '1px solid var(--colors-hairline)', borderRadius: '12px', boxShadow: 'var(--shadow-sm)' }}>
+                    <h5 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 700, color: 'var(--colors-ink)' }}>🏢 Direct Owner Routing</h5>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--colors-muted)', lineHeight: 1.6 }}>
+                      No intermediate support or middleman. Tenants chat directly with hosts via WhatsApp or direct calls to schedule visits immediately.
                     </p>
                   </div>
                 </div>
@@ -1181,13 +1209,6 @@ export default function App() {
         />
       )}
 
-      {/* Owner Listing Modal */}
-      {showListModal && (
-        <ListYourPGModal 
-          onClose={() => setShowListModal(false)}
-          onAddPG={handleAddPG}
-        />
-      )}
 
       {/* Auth Modal overlay */}
       <AuthModal 
@@ -1212,31 +1233,25 @@ export default function App() {
       />
 
       {/* Mobile Sticky Bottom Bar */}
-      {!isAdminMode && (
-        <div className="mobile-sticky-bar">
-          <button 
-            className="mobile-sticky-btn secondary"
-            onClick={() => {
-              const gridEl = document.getElementById('catalog-grid');
-              gridEl?.scrollIntoView({ behavior: 'smooth' });
-            }}
-          >
-            <Search size={14} /> Search Catalog
-          </button>
-          <button 
-            className="mobile-sticky-btn primary"
-            onClick={() => setShowListModal(true)}
-          >
-            <Home size={14} /> List PG Free
-          </button>
-        </div>
-      )}
+      <div className="mobile-sticky-bar">
+        <button 
+          className="mobile-sticky-btn primary"
+          onClick={() => {
+            const gridEl = document.getElementById('catalog-grid');
+            gridEl?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
+          <Search size={14} /> Search Catalog
+        </button>
+      </div>
 
       {/* Credit Package Purchase Modal overlay */}
       {showPurchaseModal && (
         <PurchaseModal 
           onClose={() => setShowPurchaseModal(false)}
           onPurchaseSuccess={handlePurchaseSuccess}
+          currentUser={currentUser}
+          onOpenAuth={() => setShowAuthModal(true)}
         />
       )}
 
@@ -1261,6 +1276,13 @@ export default function App() {
         />
       )}
 
+      {/* Refund Policy Modal overlay */}
+      {showRefund && (
+        <RefundModal 
+          onClose={() => setShowRefund(false)}
+        />
+      )}
+
       {/* Info Modal overlay */}
       {infoModalType && (
         <InfoModal 
@@ -1273,7 +1295,7 @@ export default function App() {
       <footer>
         <div className="container" style={{ width: '100%' }}>
           <div className="footer-grid">
-            <div className="scroll-reveal">
+            <div className="">
               <h4 className="footer-col-title">Support</h4>
               <ul className="footer-links">
                 <li><button onClick={() => setShowHelpCenter(true)} className="footer-link-btn">Help Center</button></li>
@@ -1282,8 +1304,8 @@ export default function App() {
               </ul>
             </div>
 
-            <div className="scroll-reveal">
-              <h4 className="footer-col-title">PG wala</h4>
+            <div className="">
+              <h4 className="footer-col-title">PGhive</h4>
               <ul className="footer-links">
                 <li><button onClick={() => setInfoModalType('features')} className="footer-link-btn">New features</button></li>
                 <li><button onClick={() => setInfoModalType('investors')} className="footer-link-btn">Investors</button></li>
@@ -1293,14 +1315,16 @@ export default function App() {
 
           <div className="footer-bottom" style={{ width: '100%' }}>
             <div className="caption-sm" style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-              <span>© {new Date().getFullYear()} PG wala, Inc.</span>
+              <span>© {new Date().getFullYear()} PGhive, Inc.</span>
               <button onClick={() => setShowPrivacy(true)} className="footer-link-btn-flat">Privacy</button>
               <span>·</span>
               <button onClick={() => setShowTerms(true)} className="footer-link-btn-flat">Terms</button>
               <span>·</span>
-              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Sitemap</a>
+              <button onClick={() => setShowRefund(true)} className="footer-link-btn-flat">Refund Policy</button>
               <span>·</span>
-              <a href="#" style={{ color: 'inherit', textDecoration: 'none' }}>Company details</a>
+              <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'inherit', textDecoration: 'none' }}>Sitemap</a>
+              <span>·</span>
+              <a href="#" onClick={(e) => e.preventDefault()} style={{ color: 'inherit', textDecoration: 'none' }}>Company details</a>
             </div>
             <div className="caption-sm" style={{ fontWeight: 600, display: 'flex', gap: '16px', alignItems: 'center' }}>
               <button className="footer-link-btn-flat" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1420,7 +1444,7 @@ export default function App() {
               
               {onboardingStep === 1 && (
                 <div>
-                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}><span role="img" aria-hidden="true">🔍</span> 1. Search Localities</h3>
+                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}>1. Search Localities</h3>
                   <p className="body-md" style={{ color: 'var(--colors-muted)', lineHeight: '1.6', marginBottom: '24px', fontSize: '13px' }}>
                     Explore verified co-living properties in Bangalore's tech hubs like HSR, Koramangala, Indiranagar, and Whitefield. Use filters to match your budget and gender preferences.
                   </p>
@@ -1429,7 +1453,7 @@ export default function App() {
 
               {onboardingStep === 2 && (
                 <div>
-                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}><span role="img" aria-hidden="true">🔑</span> 2. Unlock Direct Contacts</h3>
+                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}>2. Unlock Direct Contacts</h3>
                   <p className="body-md" style={{ color: 'var(--colors-muted)', lineHeight: '1.6', marginBottom: '24px', fontSize: '13px' }}>
                     Pay a nominal 1 credit (₹49) to unlock the host's direct phone number and WhatsApp. Skip the spammy agent calls.
                   </p>
@@ -1438,7 +1462,7 @@ export default function App() {
 
               {onboardingStep === 3 && (
                 <div>
-                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}><span role="img" aria-hidden="true">🏠</span> 3. Move In & Save</h3>
+                  <h3 className="title-md" style={{ marginBottom: '12px', fontSize: '18px' }}>3. Move In & Save</h3>
                   <p className="body-md" style={{ color: 'var(--colors-muted)', lineHeight: '1.6', marginBottom: '24px', fontSize: '13px' }}>
                     Negotiate directly with property owners and move in! Save up to ₹15,000+ in agent brokerage commissions.
                   </p>
@@ -1469,6 +1493,69 @@ export default function App() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Cookie Consent Banner */}
+      {cookieConsent === 'pending' && (
+        <div 
+          className="cookie-banner-custom"
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            maxWidth: '380px',
+            backgroundColor: 'var(--colors-surface-card)',
+            border: '1px solid var(--colors-hairline)',
+            borderRadius: '16px',
+            padding: '20px',
+            boxShadow: '0 12px 32px rgba(0, 0, 0, 0.1)',
+            zIndex: 9999,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            backdropFilter: 'blur(16px)',
+            animation: 'slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
+          }}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--colors-ink)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              🍪 Cookie Consent
+            </h4>
+            <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--colors-body)', lineHeight: 1.5 }}>
+              We use cookies to improve your browsing experience, analyze site traffic, and optimize direct-to-owner listing unlocks.
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={handleDenyCookies}
+              className="btn btn-secondary btn-sm"
+              style={{ flex: 1, minHeight: '36px', fontSize: '12.5px', padding: '6px 12px', borderColor: 'var(--colors-hairline)', fontWeight: 600 }}
+            >
+              Deny
+            </button>
+            <button 
+              onClick={handleAcceptCookies}
+              className="btn btn-primary btn-sm"
+              style={{ flex: 1, minHeight: '36px', fontSize: '12.5px', padding: '6px 12px', fontWeight: 700 }}
+            >
+              Accept All
+            </button>
+          </div>
+          <style>{`
+            @keyframes slideUp {
+              from { transform: translateY(100px); opacity: 0; }
+              to { transform: translateY(0); opacity: 1; }
+            }
+            @media (max-width: 480px) {
+              .cookie-banner-custom {
+                right: 16px !important;
+                left: 16px !important;
+                bottom: 16px !important;
+                max-width: none !important;
+              }
+            }
+          `}</style>
         </div>
       )}
 

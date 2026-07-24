@@ -165,7 +165,7 @@ export default function AccountCentreModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {currentUser && (
               <button 
-                className="btn btn-secondary btn-sm"
+                className="btn btn-secondary btn-sm desktop-only"
                 onClick={() => {
                   onLogout();
                   onClose();
@@ -211,8 +211,8 @@ export default function AccountCentreModal({
             {[
               { id: 'profile', label: 'Profile', icon: <User size={16} /> },
               { id: 'favorites', label: 'Wishlist', icon: <Heart size={16} /> },
-              { id: 'unlocked', label: 'Unlocked PGs', icon: <Key size={16} /> },
-              { id: 'payments', label: 'Billing Log', icon: <CreditCard size={16} /> }
+              { id: 'unlocked', label: 'Unlocked', icon: <Key size={16} /> },
+              { id: 'payments', label: 'Billing', icon: <CreditCard size={16} /> }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -345,6 +345,33 @@ export default function AccountCentreModal({
                         <span className="caption-sm" style={{ fontWeight: 600, color: 'var(--colors-muted)' }}>Active Security: AES-256 Auth State</span>
                       </div>
                     </div>
+
+                    {/* Log Out Action on Mobile */}
+                    <div className="mobile-logout-container">
+                      <button 
+                        className="btn btn-secondary"
+                        onClick={() => {
+                          onLogout();
+                          onClose();
+                        }}
+                        style={{ 
+                          width: '100%', 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '8px', 
+                          minHeight: '44px',
+                          border: '1.5px solid #fca5a5',
+                          fontWeight: 700,
+                          borderRadius: 'var(--rounded-md)',
+                          color: '#dc2626',
+                          backgroundColor: '#fef2f2'
+                        }}
+                      >
+                        <LogOut size={16} />
+                        <span>Log Out from PGhive</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -422,51 +449,66 @@ export default function AccountCentreModal({
                           return (
                             <div 
                               key={pg.id}
-                              style={{
-                                border: '1.5px solid var(--colors-hairline)',
-                                borderRadius: 'var(--rounded-sm)',
-                                padding: '16px',
-                                backgroundColor: 'var(--colors-surface-card)',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                flexWrap: 'wrap',
-                                gap: '16px'
-                              }}
+                              className="unlocked-card"
                             >
-                              <div style={{ minWidth: '220px' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 800, backgroundColor: 'var(--colors-surface-soft)', border: '1px solid var(--colors-hairline)', padding: '2px 8px', borderRadius: '4px', color: 'var(--colors-muted)' }}>
-                                  {pg.locality}
-                                </span>
-                                <h5 style={{ margin: '6px 0 2px 0', fontSize: '14px', fontWeight: 700, color: 'var(--colors-ink)' }}>{pg.name}</h5>
-                                <span className="caption-sm" style={{ color: 'var(--colors-muted)' }}>Host: {contact.name || 'PG Host Owner'}</span>
+                              <div className="unlocked-card-info">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '10px', fontWeight: 700, backgroundColor: 'var(--colors-surface-soft)', border: '1px solid var(--colors-hairline)', padding: '2px 8px', borderRadius: '4px', color: 'var(--colors-muted)', textTransform: 'uppercase' }}>
+                                    {pg.locality}
+                                  </span>
+                                  {contact.googleMapsUrl && (
+                                    <a 
+                                      href={contact.googleMapsUrl} 
+                                      target="_blank" 
+                                      rel="noreferrer" 
+                                      style={{ 
+                                        display: 'inline-flex', 
+                                        alignItems: 'center', 
+                                        gap: '4px', 
+                                        fontSize: '11px', 
+                                        fontWeight: 600, 
+                                        color: 'var(--colors-primary)', 
+                                        textDecoration: 'none' 
+                                      }}
+                                    >
+                                      <MapPin size={11} />
+                                      <span>Maps ↗</span>
+                                    </a>
+                                  )}
+                                </div>
+                                <h5 style={{ margin: '8px 0 3px 0', fontSize: '16px', fontWeight: 700, color: 'var(--colors-ink)' }}>{pg.name}</h5>
+                                <span className="caption-sm" style={{ color: 'var(--colors-muted)', display: 'block', marginBottom: '4px' }}>Host: {contact.name || 'PG Host Owner'}</span>
                               </div>
 
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '180px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--colors-ink)' }}>
-                                  <Phone size={12} style={{ color: 'var(--colors-muted)' }} />
-                                  <DecryptedText
-                                    text={contact.phone || '9999999999'}
-                                    animateOn="view"
-                                    speed={35}
-                                    maxIterations={12}
-                                    sequential={true}
-                                    characters="0123456789*#+!?$"
-                                  />
+                              <div className="unlocked-card-details">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--colors-body)' }}>
+                                  <Phone size={13} style={{ color: 'var(--colors-muted)' }} />
+                                  <a href={`tel:${contact.phone}`} style={{ color: 'var(--colors-body)', fontWeight: 600, textDecoration: 'none' }}>
+                                    <DecryptedText
+                                      text={contact.phone || '9999999999'}
+                                      animateOn="view"
+                                      speed={35}
+                                      maxIterations={12}
+                                      sequential={true}
+                                      characters="0123456789*#+!?$"
+                                    />
+                                  </a>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--colors-ink)' }}>
-                                  <span style={{ fontSize: '12px', color: 'var(--colors-muted)' }}>✉</span>
-                                  <DecryptedText
-                                    text={contact.email || 'host@pgwala.com'}
-                                    animateOn="view"
-                                    speed={25}
-                                    maxIterations={10}
-                                    sequential={true}
-                                  />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--colors-body)' }}>
+                                  <span style={{ fontSize: '13px', color: 'var(--colors-muted)' }}>✉</span>
+                                  <a href={`mailto:${contact.email}`} style={{ color: 'var(--colors-body)', textDecoration: 'none' }}>
+                                    <DecryptedText
+                                      text={contact.email || 'host@pghive.com'}
+                                      animateOn="view"
+                                      speed={25}
+                                      maxIterations={10}
+                                      sequential={true}
+                                    />
+                                  </a>
                                 </div>
                               </div>
 
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                              <div className="unlocked-card-actions">
                                 {contact.phone && (
                                   <a 
                                     href={`tel:${contact.phone}`} 
@@ -474,10 +516,10 @@ export default function AccountCentreModal({
                                     style={{ 
                                       display: 'flex', 
                                       alignItems: 'center', 
+                                      justifyContent: 'center',
                                       gap: '6px', 
                                       padding: '6px 12px',
-                                      minHeight: '32px',
-                                      width: 'auto',
+                                      minHeight: '36px',
                                       fontSize: '12px',
                                       backgroundColor: 'var(--colors-surface-card)',
                                       color: 'var(--colors-ink)',
@@ -489,17 +531,17 @@ export default function AccountCentreModal({
                                 )}
                                 {contact.whatsapp && (
                                   <a 
-                                    href={`https://wa.me/${contact.whatsapp.replace(/\D/g, '')}?text=Hi,%20I'm%20interested%20in%20your%20listing%20"${encodeURIComponent(pg.name)}"%20on%20PG%20wala.`} 
+                                    href={`https://wa.me/${contact.whatsapp.replace(/\D/g, '')}?text=Hi,%20I'm%20interested%20in%20your%20listing%20"${encodeURIComponent(pg.name)}"%20on%20PGhive.`} 
                                     target="_blank" 
                                     rel="noreferrer"
                                     className="btn btn-primary btn-sm"
                                     style={{ 
                                       display: 'flex', 
                                       alignItems: 'center', 
+                                      justifyContent: 'center',
                                       gap: '6px', 
                                       padding: '6px 12px',
-                                      minHeight: '32px',
-                                      width: 'auto',
+                                      minHeight: '36px',
                                       backgroundColor: 'var(--colors-whatsapp)',
                                       borderColor: 'var(--colors-whatsapp)',
                                       color: 'white',
@@ -507,28 +549,6 @@ export default function AccountCentreModal({
                                     }}
                                   >
                                     <MessageCircle size={12} /> WhatsApp
-                                  </a>
-                                )}
-                                {contact.googleMapsUrl && (
-                                  <a 
-                                    href={contact.googleMapsUrl} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className="btn btn-secondary btn-sm"
-                                    style={{ 
-                                      display: 'flex', 
-                                      alignItems: 'center', 
-                                      gap: '6px', 
-                                      padding: '6px 12px',
-                                      minHeight: '32px',
-                                      width: 'auto',
-                                      fontSize: '12px',
-                                      backgroundColor: 'var(--colors-surface-card)',
-                                      color: 'var(--colors-primary)',
-                                      borderColor: 'var(--colors-primary)'
-                                    }}
-                                  >
-                                    <MapPin size={12} style={{ color: 'var(--colors-primary)' }} /> Location
                                   </a>
                                 )}
                               </div>

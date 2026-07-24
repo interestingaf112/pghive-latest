@@ -65,7 +65,7 @@ export default function PrivacyModal({ onClose }) {
     },
     {
       title: "4. User Rights (GDPR & Privacy Compliance)",
-      content: "Users listing properties have the right to request deletion or modification of their listings at any time. For questions regarding your personal details or to request account deletion, please email support@pgwala.com."
+      content: "Users listing properties have the right to request deletion or modification of their listings at any time. For questions regarding your personal details or to request account deletion, please email support@pghive.com."
     }
   ];
 

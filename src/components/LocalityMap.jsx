@@ -89,7 +89,7 @@ export default function LocalityMap({ selectedLocality, pgs, onSelectLocality })
               boxShadow: 'var(--shadow-sm)'
             }}
           >
-            Near Me 📍
+            Near Me
           </button>
           <span style={{ fontSize: '10px', color: 'var(--colors-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Fuzzy View

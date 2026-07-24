@@ -111,11 +111,11 @@ export default function HelpCenterModal({ onClose }) {
             <h4 className="body-strong" style={{ fontSize: '15px', marginBottom: '12px' }}>Still need help?</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>✉️</span>
-                <span>Email Support: <strong>support@pgwala.com</strong></span>
+                <span style={{ fontSize: '13px', color: 'var(--colors-primary)' }}>✉</span>
+                <span>Email Support: <strong>support@pghive.com</strong></span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>📞</span>
+                <span style={{ fontSize: '13px', color: 'var(--colors-primary)' }}>☏</span>
                 <span>Phone Support: <strong>+91 62826 39323, +91 80788 51117</strong></span>
               </div>
             </div>

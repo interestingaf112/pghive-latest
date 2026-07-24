@@ -19,6 +19,7 @@ export const BANGALORE_LOCALITIES = [
   'Bannerghatta Road',
   'Basavanagudi',
   'Bellandur',
+  'Benniganahalli',
   'Bommanahalli',
   'Brookefield',
   'CV Raman Nagar',
@@ -78,3 +79,25 @@ export const BANGALORE_LOCALITIES = [
   'Yelahanka',
   'Yeshwanthpur'
 ];
+
+export const CITIES = {
+  bangalore: {
+    name: 'Bangalore',
+    localities: BANGALORE_LOCALITIES
+  }
+};
+
+export const LOCALITY_COORDINATES = {
+  'SG Palaya': { lat: 12.9341, lng: 77.6063 },
+  'Koramangala': { lat: 12.9352, lng: 77.6245 },
+  'BTM Layout': { lat: 12.9121, lng: 77.6446 },
+  'HSR Layout': { lat: 12.9101, lng: 77.6450 },
+  'Jayanagar': { lat: 12.9308, lng: 77.5802 },
+  'JP Nagar': { lat: 12.9063, lng: 77.5857 },
+  'Whitefield': { lat: 12.9698, lng: 77.7500 },
+  'Electronic City': { lat: 12.8452, lng: 77.6602 },
+  'Marathahalli': { lat: 12.9569, lng: 77.7011 },
+  'Indiranagar': { lat: 12.9719, lng: 77.6412 },
+  'Bellandur': { lat: 12.9304, lng: 77.6784 },
+  'Sarjapur Road': { lat: 12.9172, lng: 77.6845 }
+};

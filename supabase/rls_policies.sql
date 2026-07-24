@@ -1,4 +1,4 @@
--- PG WALA Row-Level Security Policies for Listing Contacts
+-- PGhive Row-Level Security Policies for Listing Contacts
 -- This migration script separates contact details from public listings
 -- and enforces database-level permission locks.
 

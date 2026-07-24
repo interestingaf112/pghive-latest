@@ -1,6 +1,6 @@
 /* eslint-disable no-control-regex */
 /**
- * Input validation and sanitization utilities for PG wala.
+ * Input validation and sanitization utilities for PGhive.
  * Used by AdminDashboard form and firebase.js before writing to any store.
  */
 

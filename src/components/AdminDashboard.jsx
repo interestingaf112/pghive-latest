@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   Plus, Trash2, UploadCloud, Image as ImageIcon, 
-  Loader2, KeyRound, Sparkles, MapPin, Grid, PlusCircle, ShieldAlert, Edit3 
+  Loader2, KeyRound, Sparkles, MapPin, Grid, PlusCircle, ShieldAlert, Edit3,
+  RotateCcw, CheckCircle2, History
 } from 'lucide-react';
 import { authenticateAdmin, sendPasswordReset } from '../firebase';
 import { sanitizeText, validatePhone, validateEmail, validatePrice } from '../utils/sanitize';
-import { BANGALORE_LOCALITIES } from '../utils/constants';
+import { CITIES, LOCALITY_COORDINATES } from '../utils/constants';
+import LocationPicker from './LocationPicker';
 
 export default function AdminDashboard({ 
   adminUser, 
@@ -25,23 +27,34 @@ export default function AdminDashboard({
 
   // PG Creation Form State
   const [pgName, setPgName] = useState('');
-  const [pgLocality, setPgLocality] = useState('Koramangala');
+  const [pgCity, setPgCity] = useState('bangalore');
+  const [pgLocality, setPgLocality] = useState(CITIES.bangalore.localities[0]);
   const [pgAddress, setPgAddress] = useState('');
   const [pgDescription, setPgDescription] = useState('');
   const [pgPrice, setPgPrice] = useState('');
-  const [pgDeposit, setPgDeposit] = useState('');
   const [pgGender, setPgGender] = useState('unisex');
   const [pgContactPhone, setPgContactPhone] = useState('');
   const [pgContactEmail, setPgContactEmail] = useState('');
   const [pgContactWhatsapp, setPgContactWhatsapp] = useState('');
   const [pgContactMapsUrl, setPgContactMapsUrl] = useState('');
+  const [pgLat, setPgLat] = useState(null);
+  const [pgLng, setPgLng] = useState(null);
+  
+
   
   // Room sharing price options
   const [sharingSingle, setSharingSingle] = useState('');
   const [sharingDouble, setSharingDouble] = useState('');
   const [sharingTriple, setSharingTriple] = useState('');
 
+  // Room sharing deposit options
+  const [sharingDepositSingle, setSharingDepositSingle] = useState('');
+  const [sharingDepositDouble, setSharingDepositDouble] = useState('');
+  const [sharingDepositTriple, setSharingDepositTriple] = useState('');
+
   // Selected Amenities
+  const [pgShowPhone, setPgShowPhone] = useState(true);
+
   const [selectedAmenities, setSelectedAmenities] = useState({
     wifi: true,
     food: true,
@@ -50,7 +63,8 @@ export default function AdminDashboard({
     laundry: false,
     backup: false,
     security: true,
-    parking: false
+    parking: false,
+    lift: false
   });
 
   // Images state
@@ -63,6 +77,7 @@ export default function AdminDashboard({
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   // Forgot Password Flow State
   const [showForgotFlow, setShowForgotFlow] = useState(false);
@@ -72,7 +87,40 @@ export default function AdminDashboard({
   const [isSendingReset, setIsSendingReset] = useState(false);
   const [activeTab, setActiveTab] = useState('listings');
 
-  const localities = BANGALORE_LOCALITIES;
+  // Centralized Activity & Purchase Logs States
+  const [unlockLogs, setUnlockLogs] = useState([]);
+  const [purchaseLogs, setPurchaseLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [searchLogQuery, setSearchLogQuery] = useState('');
+  const [logsSubTab, setLogsSubTab] = useState('unlocks'); // 'unlocks' | 'purchases'
+
+  useEffect(() => {
+    if (activeTab === 'logs' && adminUser) {
+      async function loadLogs() {
+        setLogsLoading(true);
+        try {
+          const { fetchAdminUnlockLogs, fetchAdminPurchaseLogs } = await import('../firebase');
+          const [unlocks, purchases] = await Promise.all([
+            fetchAdminUnlockLogs(),
+            fetchAdminPurchaseLogs()
+          ]);
+          setUnlockLogs(unlocks);
+          setPurchaseLogs(purchases);
+        } catch (err) {
+          console.error("Error loading logs in dashboard:", err);
+        } finally {
+          setLogsLoading(false);
+        }
+      }
+      loadLogs();
+    }
+  }, [activeTab, adminUser]);
+
+  const handleCityChange = (cityKey) => {
+    setPgCity(cityKey);
+    const firstLoc = CITIES[cityKey]?.localities[0] || '';
+    setPgLocality(firstLoc);
+  };
 
   // Focus trap container ref
   const loginPanelRef = useRef(null);
@@ -209,17 +257,25 @@ export default function AdminDashboard({
     
     // Set basic text fields
     setPgName(pg.name || '');
+    setPgCity(pg.city || 'bangalore');
     setPgLocality(pg.locality || 'Koramangala');
     setPgAddress(pg.address || '');
     setPgDescription(pg.description || '');
     setPgPrice(pg.price?.toString() || '');
-    setPgDeposit(pg.deposit?.toString() || '');
     setPgGender(pg.gender || 'unisex');
+    setPgLat(pg.lat ? parseFloat(pg.lat) : null);
+    setPgLng(pg.lng ? parseFloat(pg.lng) : null);
+
     
     // Pre-populate sharing prices
     setSharingSingle(pg.sharing?.single?.toString() || '');
     setSharingDouble(pg.sharing?.double?.toString() || '');
     setSharingTriple(pg.sharing?.triple?.toString() || '');
+
+    // Pre-populate sharing deposits
+    setSharingDepositSingle(pg.sharingDeposit?.single?.toString() || '');
+    setSharingDepositDouble(pg.sharingDeposit?.double?.toString() || '');
+    setSharingDepositTriple(pg.sharingDeposit?.triple?.toString() || '');
     
     // Pre-populate amenities
     setSelectedAmenities({
@@ -231,7 +287,9 @@ export default function AdminDashboard({
       backup: pg.amenities?.includes('backup') || false,
       security: pg.amenities?.includes('security') || false,
       parking: pg.amenities?.includes('parking') || false,
+      lift: pg.amenities?.includes('lift') || false,
     });
+    setPgShowPhone(pg.showPhone !== false);
     
     // Pre-populate existing images
     setExistingImages(pg.images || []);
@@ -269,15 +327,20 @@ export default function AdminDashboard({
     setActiveTab('add');
   };
 
+
+
   const cancelEdit = () => {
     setEditingId(null);
     setPgName('');
-    setPgLocality('Koramangala');
+    setPgCity('bangalore');
+    setPgLocality(CITIES.bangalore.localities[0]);
     setPgAddress('');
     setPgDescription('');
     setPgPrice('');
-    setPgDeposit('');
     setPgGender('unisex');
+    setPgLat(null);
+    setPgLng(null);
+
     setPgContactPhone('');
     setPgContactEmail('');
     setPgContactWhatsapp('');
@@ -285,6 +348,9 @@ export default function AdminDashboard({
     setSharingSingle('');
     setSharingDouble('');
     setSharingTriple('');
+    setSharingDepositSingle('');
+    setSharingDepositDouble('');
+    setSharingDepositTriple('');
     setSelectedAmenities({
       wifi: true,
       food: true,
@@ -293,8 +359,10 @@ export default function AdminDashboard({
       laundry: false,
       backup: false,
       security: true,
-      parking: false
+      parking: false,
+      lift: false
     });
+    setPgShowPhone(true);
     setExistingImages([]);
     setSelectedImages([]);
     imagePreviews.forEach(url => URL.revokeObjectURL(url));
@@ -334,15 +402,31 @@ export default function AdminDashboard({
         return;
       }
       
-      // Validate deposit (optional)
-      let depositVal = 0;
-      if (pgDeposit) {
-        const depResult = validatePrice(pgDeposit);
-        if (!depResult.valid) {
-          setFormError(`Deposit validation error: ${depResult.error}`);
+      // Validate sharing deposits (optional)
+      const sharingDepositData = {};
+      if (sharingDepositSingle) {
+        const singleDepVal = validatePrice(sharingDepositSingle);
+        if (!singleDepVal.valid) {
+          setFormError(`Single sharing deposit error: ${singleDepVal.error}`);
           return;
         }
-        depositVal = depResult.value;
+        sharingDepositData.single = singleDepVal.value;
+      }
+      if (sharingDepositDouble) {
+        const doubleDepVal = validatePrice(sharingDepositDouble);
+        if (!doubleDepVal.valid) {
+          setFormError(`Double sharing deposit error: ${doubleDepVal.error}`);
+          return;
+        }
+        sharingDepositData.double = doubleDepVal.value;
+      }
+      if (sharingDepositTriple) {
+        const tripleDepVal = validatePrice(sharingDepositTriple);
+        if (!tripleDepVal.valid) {
+          setFormError(`Triple sharing deposit error: ${tripleDepVal.error}`);
+          return;
+        }
+        sharingDepositData.triple = tripleDepVal.value;
       }
 
       // 3. Validate phone number
@@ -401,21 +485,58 @@ export default function AdminDashboard({
 
       setIsSubmitting(true);
 
+      // Use precise map-picker coordinates if selected, otherwise fallback to address geocoding/defaults
+      let lat = pgLat;
+      let lng = pgLng;
+
+      if (!lat || !lng) {
+        try {
+          const geocodeQuery = `${cleanAddress}, ${pgLocality}, Bangalore`;
+          const response = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(geocodeQuery)}&limit=1`);
+          const data = await response.json();
+          if (data && data.features && data.features.length > 0) {
+            lng = data.features[0].geometry.coordinates[0];
+            lat = data.features[0].geometry.coordinates[1];
+          }
+        } catch (e) {
+          console.error("Failed to dynamically geocode PG address during save:", e);
+        }
+      }
+
+      // If geocoding failed or returned null, use default coordinates for the selected locality
+      if (!lat || !lng) {
+        const matchedLocality = Object.keys(LOCALITY_COORDINATES).find(
+          key => key.toLowerCase() === pgLocality.toLowerCase()
+        );
+        if (matchedLocality) {
+          lat = LOCALITY_COORDINATES[matchedLocality].lat;
+          lng = LOCALITY_COORDINATES[matchedLocality].lng;
+        } else {
+          lat = 12.9308; // Fallback to Jayanagar
+          lng = 77.5802;
+        }
+      }
+
       // Prepare data
       const activeAmenities = Object.keys(selectedAmenities).filter(key => selectedAmenities[key]);
       
       const pgData = {
         name: cleanName,
+        city: pgCity,
         locality: pgLocality,
         address: cleanAddress,
         description: cleanDescription,
         price: priceVal.value,
-        deposit: depositVal,
+        sharingDeposit: sharingDepositData,
         gender: pgGender,
+        lat: lat,
+        lng: lng,
+
         contactPhone: phoneVal.cleaned,
         contactEmail: pgContactEmail ? pgContactEmail.trim() : '',
         contactWhatsapp: whatsappClean,
         googleMapsUrl: pgContactMapsUrl ? pgContactMapsUrl.trim() : '',
+        showPhone: pgShowPhone,
         sharing: sharingData,
         amenities: activeAmenities
       };
@@ -426,6 +547,8 @@ export default function AdminDashboard({
         setFormSuccess('PG Listing successfully updated!');
       } else {
         await onAddPG(pgData, selectedImages);
+        setShowConfetti(true);
+        setTimeout(() => setShowConfetti(false), 2000);
         setFormSuccess('PG Listing successfully created!');
       }
       
@@ -433,10 +556,14 @@ export default function AdminDashboard({
       setEditingId(null);
       setExistingImages([]);
       setPgName('');
+      setPgCity('bangalore');
       setPgAddress('');
       setPgDescription('');
       setPgPrice('');
       setPgDeposit('');
+      setPgLat(null);
+      setPgLng(null);
+
       setPgContactPhone('');
       setPgContactEmail('');
       setPgContactWhatsapp('');
@@ -633,7 +760,7 @@ export default function AdminDashboard({
       {/* Summary stats bar */}
       <div className="admin-stats-grid">
         <div className="admin-stat-card">
-          <div className="admin-stat-icon-wrapper" style={{ color: 'var(--colors-accent-blue)' }}>🏠</div>
+          <div className="admin-stat-icon-wrapper" style={{ color: '#f97316', backgroundColor: '#fff7ed', fontWeight: 800 }}>PG</div>
           <div className="admin-stat-info">
             <span className="admin-stat-number">{totalListings}</span>
             <span className="admin-stat-label">Total Listings</span>
@@ -641,7 +768,7 @@ export default function AdminDashboard({
         </div>
 
         <div className="admin-stat-card">
-          <div className="admin-stat-icon-wrapper" style={{ color: 'var(--colors-boys-text)', backgroundColor: 'var(--colors-boys-bg)' }}>👦</div>
+          <div className="admin-stat-icon-wrapper" style={{ color: '#f97316', backgroundColor: '#fff7ed', fontWeight: 800 }}>M</div>
           <div className="admin-stat-info">
             <span className="admin-stat-number">{boysListings}</span>
             <span className="admin-stat-label">Boys Only</span>
@@ -649,7 +776,7 @@ export default function AdminDashboard({
         </div>
 
         <div className="admin-stat-card">
-          <div className="admin-stat-icon-wrapper" style={{ color: '#db2777', backgroundColor: 'var(--colors-girls-bg)' }}>👧</div>
+          <div className="admin-stat-icon-wrapper" style={{ color: '#f97316', backgroundColor: '#fff7ed', fontWeight: 800 }}>F</div>
           <div className="admin-stat-info">
             <span className="admin-stat-number">{girlsListings}</span>
             <span className="admin-stat-label">Girls Only</span>
@@ -657,7 +784,7 @@ export default function AdminDashboard({
         </div>
 
         <div className="admin-stat-card">
-          <div className="admin-stat-icon-wrapper" style={{ color: '#15803d', backgroundColor: 'var(--colors-unisex-bg)' }}>👥</div>
+          <div className="admin-stat-icon-wrapper" style={{ color: '#f97316', backgroundColor: '#fff7ed', fontWeight: 800 }}>U</div>
           <div className="admin-stat-info">
             <span className="admin-stat-number">{colivingListings}</span>
             <span className="admin-stat-label">Coliving Hubs</span>
@@ -687,13 +814,20 @@ export default function AdminDashboard({
           {editingId ? <Edit3 size={16} /> : <PlusCircle size={16} />}
           <span>{editingId ? 'Editing Property' : 'Add New Property'}</span>
         </button>
+        <button 
+          className={`admin-tab-btn ${activeTab === 'logs' ? 'active' : ''}`}
+          onClick={() => setActiveTab('logs')}
+        >
+          <History size={16} />
+          <span>User Activity Logs</span>
+        </button>
       </div>
 
       {/* Tab Contents */}
       {activeTab === 'listings' ? (
         <div>
           {pgs.length === 0 ? (
-            <div className="empty-state scroll-reveal" style={{ border: '1.5px dashed var(--colors-hairline)', borderRadius: '12px', background: 'var(--colors-surface-soft)', padding: '64px 20px' }}>
+            <div className="empty-state " style={{ border: '1.5px dashed var(--colors-hairline)', borderRadius: '12px', background: 'var(--colors-surface-soft)', padding: '64px 20px' }}>
               <ShieldAlert size={40} style={{ margin: '0 auto 12px auto', color: 'var(--colors-muted)' }} />
               <h3 className="title-md" style={{ margin: 0 }}>No active listings found</h3>
               <p className="body-sm" style={{ color: 'var(--colors-muted)', margin: '8px 0 16px 0' }}>
@@ -758,6 +892,136 @@ export default function AdminDashboard({
             </div>
           )}
         </div>
+      ) : activeTab === 'logs' ? (
+        /* ==========================================
+           USER ACTIVITY LOGS VIEW
+           ========================================== */
+        <div style={{ backgroundColor: 'var(--colors-surface-card)', border: '1px solid var(--colors-hairline)', borderRadius: '16px', padding: '24px', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+          {/* Logs Tab Switcher */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                onClick={() => setLogsSubTab('unlocks')}
+                className={`btn ${logsSubTab === 'unlocks' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ width: 'auto', padding: '8px 16px', minHeight: '38px', fontSize: '13px', fontWeight: 600 }}
+              >
+                PG Unlock Logs ({unlockLogs.length})
+              </button>
+              <button 
+                onClick={() => setLogsSubTab('purchases')}
+                className={`btn ${logsSubTab === 'purchases' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{ width: 'auto', padding: '8px 16px', minHeight: '38px', fontSize: '13px', fontWeight: 600 }}
+              >
+                Plan Purchase Logs ({purchaseLogs.length})
+              </button>
+            </div>
+            
+            {/* Search filter input */}
+            <div style={{ position: 'relative', minWidth: '240px' }}>
+              <input 
+                type="text" 
+                className="form-input" 
+                placeholder="Search by email or property..." 
+                value={searchLogQuery}
+                onChange={(e) => setSearchLogQuery(e.target.value)}
+                style={{ height: '38px', fontSize: '13px', paddingLeft: '12px' }}
+              />
+            </div>
+          </div>
+
+          {logsLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0' }}>
+              <Loader2 className="animate-spin" size={32} style={{ color: 'var(--colors-primary)' }} />
+              <p style={{ marginTop: '12px', color: 'var(--colors-muted)', fontSize: '14px' }}>Loading transaction records...</p>
+            </div>
+          ) : logsSubTab === 'unlocks' ? (
+            /* ==========================================
+               UNLOCK LOGS TABLE
+               ========================================== */
+            <div>
+              {unlockLogs.filter(log => 
+                (log.userEmail || '').toLowerCase().includes(searchLogQuery.toLowerCase()) ||
+                (log.pgName || '').toLowerCase().includes(searchLogQuery.toLowerCase())
+              ).length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--colors-muted)', padding: '32px 0' }}>No unlock records found.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1.5px solid var(--colors-hairline)', color: 'var(--colors-muted)', fontWeight: 600 }}>
+                        <th style={{ padding: '12px 16px' }}>User Email</th>
+                        <th style={{ padding: '12px 16px' }}>Property Name</th>
+                        <th style={{ padding: '12px 16px' }}>Credits Spent</th>
+                        <th style={{ padding: '12px 16px' }}>Date/Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {unlockLogs
+                        .filter(log => 
+                          (log.userEmail || '').toLowerCase().includes(searchLogQuery.toLowerCase()) ||
+                          (log.pgName || '').toLowerCase().includes(searchLogQuery.toLowerCase())
+                        )
+                        .map((log) => (
+                          <tr key={log.unlockId} style={{ borderBottom: '1px solid var(--colors-hairline)' }}>
+                            <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--colors-ink)' }}>{log.userEmail}</td>
+                            <td style={{ padding: '12px 16px', color: 'var(--colors-body)' }}>{log.pgName}</td>
+                            <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--colors-accent-red)' }}>{log.creditsSpent} cr</td>
+                            <td style={{ padding: '12px 16px', color: 'var(--colors-muted)' }}>{new Date(log.timestamp).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ==========================================
+               PURCHASE LOGS TABLE
+               ========================================== */
+            <div>
+              {purchaseLogs.filter(log => 
+                (log.userEmail || '').toLowerCase().includes(searchLogQuery.toLowerCase()) ||
+                (log.planTitle || '').toLowerCase().includes(searchLogQuery.toLowerCase()) ||
+                (log.purchaseId || '').toLowerCase().includes(searchLogQuery.toLowerCase())
+              ).length === 0 ? (
+                <p style={{ textAlign: 'center', color: 'var(--colors-muted)', padding: '32px 0' }}>No purchase records found.</p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13.5px', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1.5px solid var(--colors-hairline)', color: 'var(--colors-muted)', fontWeight: 600 }}>
+                        <th style={{ padding: '12px 16px' }}>User Email</th>
+                        <th style={{ padding: '12px 16px' }}>Plan Purchased</th>
+                        <th style={{ padding: '12px 16px' }}>Credits Added</th>
+                        <th style={{ padding: '12px 16px' }}>Amount Paid</th>
+                        <th style={{ padding: '12px 16px' }}>Transaction ID</th>
+                        <th style={{ padding: '12px 16px' }}>Date/Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {purchaseLogs
+                        .filter(log => 
+                          (log.userEmail || '').toLowerCase().includes(searchLogQuery.toLowerCase()) ||
+                          (log.planTitle || '').toLowerCase().includes(searchLogQuery.toLowerCase()) ||
+                          (log.purchaseId || '').toLowerCase().includes(searchLogQuery.toLowerCase())
+                        )
+                        .map((log) => (
+                          <tr key={log.purchaseId} style={{ borderBottom: '1px solid var(--colors-hairline)' }}>
+                            <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--colors-ink)' }}>{log.userEmail}</td>
+                            <td style={{ padding: '12px 16px', color: 'var(--colors-body)', fontWeight: 500 }}>{log.planTitle}</td>
+                            <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--colors-primary)' }}>+{log.creditsAdded} cr</td>
+                            <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--colors-ink)' }}>₹{log.pricePaid}</td>
+                            <td style={{ padding: '12px 16px', fontFamily: 'monospace', color: 'var(--colors-muted)', fontSize: '12px' }}>{log.purchaseId}</td>
+                            <td style={{ padding: '12px 16px', color: 'var(--colors-muted)' }}>{new Date(log.timestamp).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       ) : (
         <form onSubmit={handleFormSubmit} className="admin-form-split">
           {/* Left Column: Form Details */}
@@ -786,6 +1050,20 @@ export default function AdminDashboard({
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
                 <div className="form-group">
+                  <label className="form-label" htmlFor="add-pg-city">City *</label>
+                  <select
+                    className="form-input"
+                    id="add-pg-city"
+                    value={pgCity}
+                    onChange={e => handleCityChange(e.target.value)}
+                  >
+                    {Object.entries(CITIES).map(([key, val]) => (
+                      <option key={key} value={key}>{val.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
                   <label className="form-label" htmlFor="add-pg-locality">Locality Hub *</label>
                    <input 
                     type="text"
@@ -798,7 +1076,7 @@ export default function AdminDashboard({
                     required
                   />
                   <datalist id="admin-pg-localities">
-                    {localities.map(loc => (
+                    {(CITIES[pgCity]?.localities || []).map(loc => (
                       <option key={loc} value={loc} />
                     ))}
                   </datalist>
@@ -816,21 +1094,27 @@ export default function AdminDashboard({
                     required
                   />
                 </div>
-
-                <div className="form-group">
-                  <label className="form-label" htmlFor="add-pg-deposit">Deposit (Optional)</label>
-                  <input 
-                    type="number" 
-                    className="form-input" 
-                    id="add-pg-deposit"
-                    placeholder="e.g. 15000" 
-                    value={pgDeposit}
-                    onChange={e => setPgDeposit(e.target.value)}
-                  />
-                </div>
               </div>
 
-
+              <LocationPicker
+                onSelect={(coords) => {
+                  setPgLat(coords.lat);
+                  setPgLng(coords.lng);
+                }}
+                defaultCenter={(() => {
+                  const cleaned = pgLocality?.trim().toLowerCase();
+                  if (cleaned) {
+                    const match = Object.keys(LOCALITY_COORDINATES).find(
+                      key => key.toLowerCase() === cleaned
+                    );
+                    if (match) {
+                      return [LOCALITY_COORDINATES[match].lat, LOCALITY_COORDINATES[match].lng];
+                    }
+                  }
+                  return [12.9716, 77.5946];
+                })()}
+                value={pgLat && pgLng ? { lat: pgLat, lng: pgLng } : null}
+              />
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" htmlFor="add-pg-description">Room Description & Guidelines *</label>
@@ -847,7 +1131,7 @@ export default function AdminDashboard({
             </div>
 
             <div className="admin-form-card">
-              <h4 className="admin-form-card-title">👥 Occupancy & Amenities</h4>
+              <h4 className="admin-form-card-title">Occupancy & Amenities</h4>
               
               <div className="form-group">
                 <label id="gender-label" className="form-label">Gender Target</label>
@@ -889,12 +1173,12 @@ export default function AdminDashboard({
               </div>
 
               <div className="form-group">
-                <label className="form-label">Sharing Options (₹/mo)</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '4px' }}>
+                <label className="form-label">Sharing Prices (₹/mo)</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '4px', marginBottom: '8px' }}>
                   <input 
                     type="number" 
                     className="form-input" 
-                    placeholder="Single price" 
+                    placeholder="Single Rent" 
                     aria-label="Single occupancy price"
                     value={sharingSingle}
                     onChange={e => setSharingSingle(e.target.value)}
@@ -902,7 +1186,7 @@ export default function AdminDashboard({
                   <input 
                     type="number" 
                     className="form-input" 
-                    placeholder="Double price" 
+                    placeholder="Double Rent" 
                     aria-label="Double occupancy price"
                     value={sharingDouble}
                     onChange={e => setSharingDouble(e.target.value)}
@@ -910,10 +1194,38 @@ export default function AdminDashboard({
                   <input 
                     type="number" 
                     className="form-input" 
-                    placeholder="Triple price" 
+                    placeholder="Triple Rent" 
                     aria-label="Triple occupancy price"
                     value={sharingTriple}
                     onChange={e => setSharingTriple(e.target.value)}
+                  />
+                </div>
+                
+                <label className="form-label">Sharing Deposits (₹)</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginTop: '4px' }}>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="Single Deposit" 
+                    aria-label="Single occupancy deposit"
+                    value={sharingDepositSingle}
+                    onChange={e => setSharingDepositSingle(e.target.value)}
+                  />
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="Double Deposit" 
+                    aria-label="Double occupancy deposit"
+                    value={sharingDepositDouble}
+                    onChange={e => setSharingDepositDouble(e.target.value)}
+                  />
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    placeholder="Triple Deposit" 
+                    aria-label="Triple occupancy deposit"
+                    value={sharingDepositTriple}
+                    onChange={e => setSharingDepositTriple(e.target.value)}
                   />
                 </div>
               </div>
@@ -930,7 +1242,7 @@ export default function AdminDashboard({
                         onChange={() => handleAmenityToggle(key)}
                         style={{ accentColor: 'var(--colors-accent-blue)' }}
                       />
-                      <span>{key === 'backup' ? 'Power Backup' : key}</span>
+                      <span>{key === 'backup' ? 'Power Backup' : key === 'lift' ? 'Lift / Elevator' : key}</span>
                     </label>
                   ))}
                 </div>
@@ -941,7 +1253,7 @@ export default function AdminDashboard({
           {/* Right Column: Contact & Media */}
           <div>
             <div className="admin-form-card">
-              <h4 className="admin-form-card-title">📞 Contact Information</h4>
+              <h4 className="admin-form-card-title">Contact Information</h4>
 
               <div className="form-group">
                 <label className="form-label" htmlFor="add-pg-phone">Mobile Number *</label>
@@ -991,10 +1303,25 @@ export default function AdminDashboard({
                   onChange={e => setPgContactMapsUrl(e.target.value)}
                 />
               </div>
+
+              <div className="form-group" style={{ marginTop: '12px', marginBottom: 0 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={pgShowPhone}
+                    onChange={() => setPgShowPhone(!pgShowPhone)}
+                    style={{ accentColor: 'var(--colors-accent-blue)', cursor: 'pointer', width: '16px', height: '16px' }}
+                  />
+                  Display phone number on listing
+                </label>
+                <span style={{ fontSize: '11px', color: 'var(--colors-muted)', marginTop: '4px', display: 'block' }}>
+                  When unchecked, only WhatsApp will be visible to users.
+                </span>
+              </div>
             </div>
 
             <div className="admin-form-card">
-              <h4 className="admin-form-card-title">🖼️ Media & Photos</h4>
+              <h4 className="admin-form-card-title">Media & Photos</h4>
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" htmlFor="add-pg-photos">Property Photos *</label>
@@ -1040,7 +1367,7 @@ export default function AdminDashboard({
                              style={{ position: 'absolute', top: '2px', right: '2px', backgroundColor: 'rgba(225, 29, 72, 0.9)', color: 'white', border: 'none', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                              title="Remove photo"
                            >
-                             ✕
+                             x
                            </button>
                          </div>
                        ))}
@@ -1062,7 +1389,7 @@ export default function AdminDashboard({
                              onClick={() => removeSelectedImage(idx)}
                              style={{ position: 'absolute', top: '2px', right: '2px', backgroundColor: 'rgba(9, 9, 11, 0.75)', color: 'white', border: 'none', borderRadius: '50%', width: '16px', height: '16px', fontSize: '9px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                            >
-                             ✕
+                             x
                            </button>
                          </div>
                        ))}
@@ -1072,24 +1399,61 @@ export default function AdminDashboard({
                </div>
              </div>
  
-             <button 
-               type="submit" 
-               className="btn btn-primary" 
-               style={{ width: '100%', height: '48px', fontWeight: 700, fontSize: '14.5px' }}
-               disabled={isSubmitting}
-             >
-               {isSubmitting ? (
-                 <>
-                   <Loader2 className="animate-spin" size={16} />
-                   <span>{editingId ? 'Saving property details...' : 'Publishing room listing...'}</span>
-                 </>
-               ) : (
-                 <>
-                   {editingId ? <Edit3 size={16} /> : <Plus size={16} />}
-                   <span>{editingId ? 'Save Changes' : 'Publish Property Listing'}</span>
-                 </>
-               )}
-             </button>
+             {/* Confetti animation overlay */}
+             {showConfetti && (
+               <div className="publish-confetti-overlay" style={{ position: 'fixed', inset: 0, zIndex: 9999 }}>
+                 {[...Array(40)].map((_, i) => (
+                   <div
+                     key={i}
+                     className="confetti-particle"
+                     style={{
+                       left: `${Math.random() * 100}%`,
+                       animationDelay: `${Math.random() * 0.6}s`,
+                       animationDuration: `${1 + Math.random() * 1.5}s`,
+                       backgroundColor: ['#4F46E5', '#22C55E', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'][i % 6],
+                       width: `${6 + Math.random() * 8}px`,
+                       height: `${6 + Math.random() * 8}px`,
+                       borderRadius: Math.random() > 0.5 ? '50%' : '2px',
+                       transform: `rotate(${Math.random() * 360}deg)`
+                     }}
+                   />
+                 ))}
+                 <div className="publish-success-pulse">
+                   <CheckCircle2 size={72} strokeWidth={2.5} />
+                 </div>
+               </div>
+             )}
+
+             <div style={{ display: 'flex', gap: '10px' }}>
+               <button
+                 type="button"
+                 className="btn btn-secondary"
+                 onClick={cancelEdit}
+                 style={{ height: '48px', fontWeight: 600, fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', padding: '0 18px', flexShrink: 0 }}
+                 title="Reset all fields"
+               >
+                 <RotateCcw size={14} />
+                 Reset
+               </button>
+               <button 
+                 type="submit" 
+                 className="btn btn-primary" 
+                 style={{ flex: 1, height: '48px', fontWeight: 700, fontSize: '14.5px' }}
+                 disabled={isSubmitting}
+               >
+                 {isSubmitting ? (
+                   <>
+                     <Loader2 className="animate-spin" size={16} />
+                     <span>{editingId ? 'Saving...' : 'Publishing...'}</span>
+                   </>
+                 ) : (
+                   <>
+                     {editingId ? <Edit3 size={16} /> : <Plus size={16} />}
+                     <span>{editingId ? 'Save Changes' : 'Publish Property Listing'}</span>
+                   </>
+                 )}
+               </button>
+             </div>
 
              {editingId && (
                <button 
