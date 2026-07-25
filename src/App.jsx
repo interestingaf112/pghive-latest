@@ -23,11 +23,63 @@ import AuthModal from './components/AuthModal';
 import AccountCentreModal from './components/AccountCentreModal';
 import { Analytics } from '@vercel/analytics/react';
 import { getLocalitySlug, getListingSlug } from './utils/sanitize';
-import { Search, SlidersHorizontal, Home, Coins, Globe, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { Search, SlidersHorizontal, Home, Coins, Globe, ChevronLeft, ChevronRight, RotateCcw, ChevronDown } from 'lucide-react';
 import { BANGALORE_LOCALITIES, CITIES } from './utils/constants';
+
+const FAQS = [
+  {
+    q: "What is a PG (Paying Guest) accommodation?",
+    a: "A PG, or Paying Guest accommodation, is a furnished room or shared living space rented out by a property owner, typically including basic amenities like Wi-Fi, housekeeping, and sometimes food. PGs are a popular housing option in Bangalore for students, working professionals, and newcomers to the city who want a hassle-free, flexible living arrangement without a long-term lease commitment."
+  },
+  {
+    q: "How much does a PG cost in Bangalore?",
+    a: "PG rents in Bangalore generally range from ₹6,000 to ₹20,000 per month, depending on the locality, sharing type (single, double, or triple occupancy), and whether food is included. Areas closer to major tech hubs like Koramangala, HSR Layout, and Marathahalli tend to be priced higher, while localities slightly further from the city center offer more budget-friendly options."
+  },
+  {
+    q: "Which are the best areas for PGs in Bangalore?",
+    a: "Popular PG localities in Bangalore include Koramangala, HSR Layout, Indiranagar, BTM Layout, Marathahalli, and SG Palya — each suited to different needs. Areas near tech parks (Koramangala, HSR Layout, Marathahalli) work well for IT professionals, while SG Palya is popular with students due to its proximity to Christ University."
+  },
+  {
+    q: "Do PGs in Bangalore include food?",
+    a: "Many PGs in Bangalore include food as part of the rent, usually covering breakfast and dinner on weekdays. Some PGs also offer a food-optional plan at a reduced rate for those who prefer to manage their own meals."
+  },
+  {
+    q: "Are there separate PGs for girls, boys, and co-living options?",
+    a: "Yes, Bangalore has a wide range of PG options catering to boys-only, girls-only, and unisex/co-living arrangements. You can filter listings on PGhive by gender preference to find PGs that suit your requirements."
+  },
+  {
+    q: "What should I check before finalizing a PG in Bangalore?",
+    a: "Before finalizing a PG, it's a good idea to check the amenities included (Wi-Fi, power backup, laundry, food), the sharing configuration and total rent, house rules (visitor policy, curfew timings if any), and to visit the property in person or speak directly with the owner before making any payment."
+  },
+  {
+    q: "What is PGhive?",
+    a: "PGhive is a direct-to-owner PG and co-living marketplace for Bangalore. Instead of going through brokers who charge commission, PGhive connects PG seekers directly with verified property owners, so you can negotiate rent and terms without middlemen."
+  },
+  {
+    q: "How does PGhive work?",
+    a: "Browse and filter PG listings in Bangalore by locality, budget, sharing type, and gender preference. When you find a PG you're interested in, unlock the owner's direct phone number and WhatsApp contact for a small one-time fee. From there, you coordinate the visit, lease terms, and move-in directly with the property owner."
+  },
+  {
+    q: "Is PGhive really zero brokerage?",
+    a: "Yes. PGhive doesn't charge any brokerage or commission on your rent. The only cost is a small nominal fee to unlock a verified owner's contact details — a fraction of what a traditional broker would typically charge."
+  },
+  {
+    q: "How much does it cost to unlock a PG owner's contact on PGhive?",
+    a: "Unlocking a single owner's contact details costs 1 credit (₹49). PGhive also offers credit packs for those exploring multiple PGs — a Starter Pack (5 credits) and an Unlimited Value pack (12 credits) at a lower per-unlock cost."
+  },
+  {
+    q: "Is it safe to pay for contact unlock on PGhive?",
+    a: "Payments are processed securely through Razorpay, a trusted and widely-used payment gateway in India. PGhive does not handle or store your card/payment details directly — all transactions are verified and processed through Razorpay's secure system."
+  },
+  {
+    q: "How do I know a listing on PGhive is genuine?",
+    a: "PGhive listings are added by verified hosts through the platform's dashboard. As with any online marketplace, it's recommended to speak with the owner and visit the property in person before making any payment or commitment."
+  }
+];
 
 export default function App() {
   const [pgs, setPgs] = useState([]);
+  const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [is404, setIs404] = useState(false);
   const [selectedCity, setSelectedCity] = useState('bangalore');
@@ -686,6 +738,38 @@ export default function App() {
     };
   }, [filteredPGs, selectedLocality, selectedCity]);
 
+  // Inject/update FAQPage Schema
+  useEffect(() => {
+    const existingFaqSchema = document.getElementById('faq-page-schema');
+    if (existingFaqSchema) existingFaqSchema.remove();
+
+    if (selectedLocality === 'all') {
+      const faqSchemaData = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": FAQS.map(faq => ({
+          "@type": "Question",
+          "name": faq.q,
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": faq.a
+          }
+        }))
+      };
+
+      const script = document.createElement('script');
+      script.id = 'faq-page-schema';
+      script.type = 'application/ld+json';
+      script.text = JSON.stringify(faqSchemaData);
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      const activeFaqSchema = document.getElementById('faq-page-schema');
+      if (activeFaqSchema) activeFaqSchema.remove();
+    };
+  }, [selectedLocality]);
+
   return (
     <>
       {/* Clean Minimalist Background Grid */}
@@ -1221,6 +1305,45 @@ export default function App() {
                     </p>
                   </div>
                 </div>
+              </div>
+            </section>
+
+            {/* FAQ Accordion Section */}
+            <section className="faq-section container animate-reveal" style={{ width: '100%' }}>
+              <div className="faq-header">
+                <span className="hero-tagline" style={{ display: 'inline-block', marginBottom: '16px' }}>Got Questions?</span>
+                <h3 className="section-title" style={{ margin: '0 0 16px 0', fontSize: '36px', lineHeight: 1.2, fontWeight: 800 }}>
+                  Frequently Asked Questions
+                </h3>
+                <p className="body-md" style={{ color: 'var(--colors-muted)', maxWidth: '600px', margin: '0 auto' }}>
+                  Everything you need to know about PGs in Bangalore and how PGhive makes co-living simple.
+                </p>
+              </div>
+
+              <div className="faq-container">
+                {FAQS.map((faq, index) => {
+                  const isActive = expandedFaqIndex === index;
+                  return (
+                    <div 
+                      key={index} 
+                      className={`faq-item ${isActive ? 'active' : ''}`}
+                    >
+                      <button 
+                        className="faq-trigger"
+                        onClick={() => setExpandedFaqIndex(isActive ? null : index)}
+                        aria-expanded={isActive}
+                      >
+                        <span className="faq-question">{faq.q}</span>
+                        <span className="faq-icon">
+                          <ChevronDown size={16} />
+                        </span>
+                      </button>
+                      <div className="faq-content">
+                        <p className="faq-answer">{faq.a}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           </div>

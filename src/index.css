@@ -4531,3 +4531,107 @@ textarea:focus-visible,
 .animate-fade-in-up {
   animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ==========================================================================
+   FAQ Accordion Section Styles
+   ========================================================================== */
+.faq-section {
+  width: 100%;
+  border-top: 1px solid var(--colors-hairline);
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+
+.faq-header {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.faq-container {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.faq-item {
+  background-color: var(--colors-surface-card);
+  border: 1px solid var(--colors-hairline);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.faq-item:hover {
+  border-color: var(--colors-primary);
+  box-shadow: 0 4px 20px rgba(200, 0, 0, 0.02);
+}
+
+.faq-trigger {
+  width: 100%;
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+}
+
+.faq-question {
+  font-family: var(--font-family-display);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--colors-ink);
+  margin: 0;
+  line-height: 1.4;
+  transition: color 0.2s ease;
+}
+
+.faq-item:hover .faq-question {
+  color: var(--colors-primary);
+}
+
+.faq-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--colors-surface-soft);
+  color: var(--colors-muted);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  margin-left: 16px;
+}
+
+.faq-item.active .faq-icon {
+  background-color: var(--colors-primary);
+  color: #ffffff;
+  transform: rotate(180deg);
+}
+
+.faq-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.faq-item.active .faq-content {
+  max-height: 300px; /* High enough value for dynamic expansion */
+}
+
+.faq-answer {
+  padding: 0 24px 24px 24px;
+  font-size: 14px;
+  color: var(--colors-body);
+  line-height: 1.6;
+  margin: 0;
+}
+
