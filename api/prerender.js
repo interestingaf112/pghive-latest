@@ -27,6 +27,8 @@ function getListingSlug(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+const PRODUCTION_DOMAIN = 'https://www.pghive.co.in';
+
 export default async function handler(req, res) {
   // Set caching headers for Vercel CDN Edge nodes
   // s-maxage=3600 (cache at Edge for 1 hour)
@@ -45,7 +47,7 @@ export default async function handler(req, res) {
   }
 
   // Parse path info
-  const url = new URL(req.url, `https://${req.headers.host || 'www.pghive.co.in'}`);
+  const url = new URL(req.url, PRODUCTION_DOMAIN);
   const pathname = url.pathname;
 
   // Matching patterns
@@ -54,8 +56,8 @@ export default async function handler(req, res) {
 
   let title = "PGhive | Premium Paying Guest Accommodations in Bangalore";
   let description = "Find the best Paying Guest (PG) accommodations in Bangalore with PGhive. Filter by locality, price, amenities, and gender preferences. Zero brokerage — contact owners directly.";
-  let canonicalUrl = `https://www.pghive.co.in${pathname}`;
-  let ogImage = "https://www.pghive.co.in/logo-cropped.png";
+  let canonicalUrl = `${PRODUCTION_DOMAIN}${pathname}`;
+  let ogImage = `${PRODUCTION_DOMAIN}/logo-cropped.png`;
   let schemaScripts = "";
 
   if (listingMatch) {
@@ -116,13 +118,13 @@ export default async function handler(req, res) {
               "@type": "ListItem",
               "position": 1,
               "name": "Home",
-              "item": "https://www.pghive.co.in"
+              "item": PRODUCTION_DOMAIN
             },
             {
               "@type": "ListItem",
               "position": 2,
               "name": pg.locality,
-              "item": `https://www.pghive.co.in/pg/${getLocalitySlug(pg.locality)}`
+              "item": `${PRODUCTION_DOMAIN}/pg/${getLocalitySlug(pg.locality)}`
             },
             {
               "@type": "ListItem",
@@ -158,16 +160,16 @@ export default async function handler(req, res) {
           "@type": "ListItem",
           "position": 1,
           "name": "Home",
-          "item": "https://www.pghive.co.in"
-            },
-            {
-              "@type": "ListItem",
-              "position": 2,
-              "name": localityName,
-              "item": canonicalUrl
-            }
-          ]
-        };
+          "item": PRODUCTION_DOMAIN
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": localityName,
+          "item": canonicalUrl
+        }
+      ]
+    };
 
         schemaScripts = `
           <script type="application/ld+json" id="dynamic-breadcrumb-schema">${JSON.stringify(breadcrumbSchema)}</script>

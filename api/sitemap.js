@@ -22,13 +22,15 @@ function getListingSlug(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 }
 
+const PRODUCTION_DOMAIN = 'https://www.pghive.co.in';
+
 export default async function handler(req, res) {
   // Set cache headers to hold sitemap at CDN Edge for 1 hour
   res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400');
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
 
   let urls = [
-    { loc: 'https://www.pghive.co.in/', changefreq: 'daily', priority: '1.0' }
+    { loc: `${PRODUCTION_DOMAIN}/`, changefreq: 'daily', priority: '1.0' }
   ];
 
   try {
@@ -49,7 +51,7 @@ export default async function handler(req, res) {
       const localitySlug = getLocalitySlug(pg.locality);
       if (listingSlug && localitySlug) {
         urls.push({
-          loc: `https://www.pghive.co.in/pg/${localitySlug}/${listingSlug}-${doc.id}`,
+          loc: `${PRODUCTION_DOMAIN}/pg/${localitySlug}/${listingSlug}-${doc.id}`,
           changefreq: 'weekly',
           priority: '0.8'
         });
@@ -60,7 +62,7 @@ export default async function handler(req, res) {
       const slug = getLocalitySlug(loc);
       if (slug) {
         urls.push({
-          loc: `https://www.pghive.co.in/pg/${slug}`,
+          loc: `${PRODUCTION_DOMAIN}/pg/${slug}`,
           changefreq: 'daily',
           priority: '0.9'
         });
