@@ -661,7 +661,7 @@ export default function App() {
       const itemListElement = filteredPGs.map((pg, index) => ({
         "@type": "ListItem",
         "position": index + 1,
-        "url": `https://pghive-app.vercel.app/?pg=${pg.id}`,
+        "url": `https://www.pghive.co.in/pg/${getLocalitySlug(pg.locality)}/${getListingSlug(pg.name)}-${pg.id}`,
         "name": pg.name
       }));
 
