@@ -485,8 +485,9 @@ export default function PGDetailsModal({
             <div className="bento-img-container bento-main" onClick={() => handleOpenFullscreen(0)}>
               <img 
                 src={images[0]} 
-                alt={`${pg.name} featured view`} 
+                alt={`${pg.name} featured co-living space room view in ${pg.locality}, Bangalore`} 
                 className="bento-img"
+                loading="eager"
               />
             </div>
             
@@ -499,8 +500,9 @@ export default function PGDetailsModal({
               >
                 <img 
                   src={img} 
-                  alt={`${pg.name} view ${idx + 2}`} 
+                  alt={`${pg.name} co-living room interior view in ${pg.locality}, Bangalore`} 
                   className="bento-img"
+                  loading="lazy"
                 />
               </div>
             ))}
@@ -970,8 +972,9 @@ export default function PGDetailsModal({
             )}
             <img 
               src={images[fullscreenImageIndex]} 
-              alt={`${pg.name} fullscreen view`} 
+              alt={`${pg.name} co-living room view full photo in ${pg.locality}`} 
               className="fullscreen-gallery-img"
+              loading="lazy"
             />
             {images.length > 1 && (
               <button 

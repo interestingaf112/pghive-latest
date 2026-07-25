@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /secure-host-portal-8392
+Disallow: /admin.html
 
-Sitemap: https://pghive-app.vercel.app/sitemap.xml
+Sitemap: https://www.pghive.co.in/sitemap.xml

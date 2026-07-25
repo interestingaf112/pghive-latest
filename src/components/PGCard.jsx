@@ -71,7 +71,7 @@ export default function PGCard({ pg, onViewDetails, isUnlocked }) {
   };
 
   return (
-    <div 
+    <article 
       className="pg-card-redesign" 
       onClick={() => onViewDetails(pg)}
       onKeyDown={handleKeyDown}
@@ -226,9 +226,10 @@ export default function PGCard({ pg, onViewDetails, isUnlocked }) {
           <div style={{ width: '100%', height: '100%', position: 'relative' }}>
             <img 
               src={images[activeImageIndex]}
-              alt={`${pg.name} room`}
+              alt={`${pg.name} co-living room in ${pg.locality}, Bangalore`}
               onLoad={() => setImageLoaded(true)}
               className="pg-img-flat"
+              loading="lazy"
             />
             
 
@@ -398,6 +399,6 @@ export default function PGCard({ pg, onViewDetails, isUnlocked }) {
           )}
         </div>
       </div>
-    </div>
+    </article>
   );
 }

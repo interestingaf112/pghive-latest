@@ -1,8 +1,25 @@
 {
+  "redirects": [
+    {
+      "source": "/pg-in-:locality",
+      "destination": "/pg/:locality",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/secure-host-portal-8392", "destination": "/admin.html" },
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/pg/:locality", "destination": "/api/prerender" },
+    { "source": "/pg/:locality/:slug", "destination": "/api/prerender" },
+    { "source": "/", "destination": "/api/prerender" },
+    { "source": "/index.html", "destination": "/api/prerender" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
+  "functions": {
+    "api/prerender.js": {
+      "includeFiles": "dist/index.html"
+    }
+  },
   "headers": [
     {
       "source": "/assets/(.*)",
@@ -34,7 +51,7 @@
         },
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://pghive-app.vercel.app"
+          "value": "https://www.pghive.co.in"
         },
         {
           "key": "Access-Control-Allow-Methods",

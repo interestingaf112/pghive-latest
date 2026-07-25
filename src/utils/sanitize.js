@@ -213,3 +213,23 @@ export function validateFile(file, maxSizeMB = 5) {
   return { valid: true, error: '', sanitizedName };
 }
 
+/**
+ * Convert a locality name to a URL-friendly slug.
+ * @param {string} loc - Locality name
+ * @returns {string} Slugified locality
+ */
+export function getLocalitySlug(loc) {
+  if (!loc) return '';
+  return loc.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+}
+
+/**
+ * Convert a listing title to a URL-friendly slug.
+ * @param {string} name - Listing title
+ * @returns {string} Slugified title
+ */
+export function getListingSlug(name) {
+  if (!name) return '';
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+

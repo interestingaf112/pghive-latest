@@ -22,6 +22,7 @@ import InfoModal from './components/InfoModal';
 import AuthModal from './components/AuthModal';
 import AccountCentreModal from './components/AccountCentreModal';
 import { Analytics } from '@vercel/analytics/react';
+import { getLocalitySlug, getListingSlug } from './utils/sanitize';
 import { Search, SlidersHorizontal, Home, Coins, Globe, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { BANGALORE_LOCALITIES, CITIES } from './utils/constants';
 
@@ -355,12 +356,9 @@ export default function App() {
   const handleSelectPG = async (pg) => {
     setSelectedPG(pg);
     if (pg) {
-      // Add ?pg=pgId to URL query params
-      const params = new URLSearchParams(window.location.search);
-      params.set('pg', pg.id);
-      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      const newUrl = `/pg/${getLocalitySlug(pg.locality)}/${getListingSlug(pg.name)}-${pg.id}`;
       window.history.pushState({}, '', newUrl);
-
+ 
       // Pre-fetch unlocked contacts if already unlocked
       if (unlockedPGIds.includes(pg.id) && !unlockedContacts[pg.id]) {
         try {
@@ -373,24 +371,15 @@ export default function App() {
         }
       }
     } else {
-      // Remove ?pg parameter cleanly from URL
-      const params = new URLSearchParams(window.location.search);
-      params.delete('pg');
-      const searchStr = params.toString();
-      const newUrl = searchStr ? `${window.location.pathname}?${searchStr}` : window.location.pathname;
-      window.history.pushState({}, '', newUrl);
+      const parentUrl = selectedLocality === 'all' ? '/' : `/pg/${getLocalitySlug(selectedLocality)}`;
+      window.history.pushState({}, '', parentUrl);
     }
-  };
-
-  // Helper to format locality for URL
-  const getLocalitySlug = (loc) => {
-    return loc.toLowerCase().replace(/\s+/g, '-');
   };
 
   // Sync state to URL client-side
   const handleLocalityChange = (loc) => {
     setSelectedLocality(loc);
-    const slug = loc === 'all' ? '' : `/pg-in-${getLocalitySlug(loc)}`;
+    const slug = loc === 'all' ? '' : `/pg/${getLocalitySlug(loc)}`;
     const newPath = slug || '/';
     if (window.location.pathname !== newPath) {
       window.history.pushState({}, '', newPath);
@@ -448,47 +437,88 @@ export default function App() {
   // Client-side SEO URL router mount & popstate handler
   useEffect(() => {
     const handleLocationChange = () => {
-      // 1. Locality routing
       const path = window.location.pathname;
-      const match = path.match(/^\/pg-in-([a-zA-Z0-9-]+)$/i);
       let validRoute = false;
+      let targetLocality = 'all';
+      let targetPGId = null;
 
-      if (match) {
+      // 1. Match listing details route: /pg/[locality-slug]/[listing-slug]-[id]
+      const listingMatch = path.match(/^\/pg\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9-]+)-([a-zA-Z0-9]+)$/i);
+      // 2. Match clean locality route: /pg/[locality-slug]
+      const localityMatch = path.match(/^\/pg\/([a-zA-Z0-9-]+)$/i);
+      // 3. Match legacy locality route: /pg-in-[locality-slug]
+      const legacyLocalityMatch = path.match(/^\/pg-in-([a-zA-Z0-9-]+)$/i);
+
+      if (listingMatch) {
         validRoute = true;
-        const slug = match[1];
-        const found = [...currentCityLocalities, ...pgs.map(p => p.locality)].find(
-          loc => getLocalitySlug(loc) === slug
+        const localitySlug = listingMatch[1];
+        targetPGId = listingMatch[3];
+        
+        // Find locality
+        const foundLoc = [...currentCityLocalities, ...pgs.map(p => p.locality)].find(
+          loc => getLocalitySlug(loc) === localitySlug
         );
-        if (found) {
-          setSelectedLocality(found);
-        } else {
-          const formatted = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
-          setSelectedLocality(formatted);
-        }
+        targetLocality = foundLoc || localitySlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      } else if (localityMatch) {
+        validRoute = true;
+        const localitySlug = localityMatch[1];
+        
+        const foundLoc = [...currentCityLocalities, ...pgs.map(p => p.locality)].find(
+          loc => getLocalitySlug(loc) === localitySlug
+        );
+        targetLocality = foundLoc || localitySlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      } else if (legacyLocalityMatch) {
+        validRoute = true;
+        const localitySlug = legacyLocalityMatch[1];
+        
+        const foundLoc = [...currentCityLocalities, ...pgs.map(p => p.locality)].find(
+          loc => getLocalitySlug(loc) === localitySlug
+        );
+        targetLocality = foundLoc || localitySlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        
+        // Client-side canonical rewrite to clean url: /pg/:locality
+        window.history.replaceState({}, '', `/pg/${localitySlug}`);
       } else if (path === '/' || path === '' || path === '/index.html') {
         validRoute = true;
-        setSelectedLocality('all');
+        targetLocality = 'all';
       }
 
       setIs404(!validRoute);
+      setSelectedLocality(targetLocality);
 
-      // 2. Deep linking check for ?pg=pgId
-      const params = new URLSearchParams(window.location.search);
-      const pgId = params.get('pg');
-      if (pgId && pgs.length > 0) {
-        const foundPG = pgs.find(p => p.id === pgId);
-        if (foundPG) {
-          setSelectedPG(foundPG);
-          if (unlockedPGIds.includes(pgId) && !unlockedContacts[pgId]) {
-            unlockPGContact(pgId).then(contacts => {
-              if (contacts) {
-                setUnlockedContacts(prev => ({ ...prev, [pgId]: contacts }));
-              }
-            }).catch(err => console.error("Error fetching prefetched contacts:", err));
+      // Deep linking check for matched listing ID
+      if (targetPGId) {
+        if (pgs.length > 0) {
+          const foundPG = pgs.find(p => p.id === targetPGId);
+          if (foundPG) {
+            setSelectedPG(foundPG);
+            if (unlockedPGIds.includes(targetPGId) && !unlockedContacts[targetPGId]) {
+              unlockPGContact(targetPGId).then(contacts => {
+                if (contacts) {
+                  setUnlockedContacts(prev => ({ ...prev, [targetPGId]: contacts }));
+                }
+              }).catch(err => console.error("Error fetching prefetched contacts:", err));
+            }
+          } else {
+            // Soft-404: listing ID was not found in database
+            setSelectedPG(null);
+            setIs404(true);
           }
         }
       } else {
-        setSelectedPG(null);
+        // Support backward compatibility check for query-based ?pg=pgId
+        const params = new URLSearchParams(window.location.search);
+        const queryPgId = params.get('pg');
+        if (queryPgId && pgs.length > 0) {
+          const foundPG = pgs.find(p => p.id === queryPgId);
+          if (foundPG) {
+            setSelectedPG(foundPG);
+            // Replace search param with clean path
+            window.history.replaceState({}, '', `/pg/${getLocalitySlug(foundPG.locality)}/${getListingSlug(foundPG.name)}-${foundPG.id}`);
+          }
+        } else {
+          setSelectedPG(null);
+        }
       }
     };
 
