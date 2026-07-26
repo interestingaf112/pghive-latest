@@ -446,6 +446,13 @@ export default function App() {
     }
   };
 
+  const handleFooterLocalityClick = (e, loc) => {
+    e.preventDefault();
+    handleLocalityChange(loc);
+    const gridEl = document.getElementById('catalog-grid') || document.getElementById('explore-section');
+    gridEl?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   const handleAiSearch = async (e) => {
     e.preventDefault();
     if (!aiInputQuery.trim()) return;
@@ -1177,7 +1184,7 @@ export default function App() {
             </div>
 
             {/* Explore Hubs Section */}
-            <section className="hubs-section container" style={{ width: '100%', position: 'relative' }}>
+            <section className="hubs-section container" id="hubs-section" style={{ width: '100%', position: 'relative' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '28px' }}>
                 <div className="" style={{ textAlign: 'left' }}>
                   <h3 className="section-title" style={{ margin: 0 }}>Explore Bangalore's top co-living hubs</h3>
@@ -1240,7 +1247,7 @@ export default function App() {
               </div>
             </section>
             {/* How It Works Step Guide */}
-            <section className="how-it-works container" style={{ width: '100%' }}>
+            <section className="how-it-works container" id="how-it-works" style={{ width: '100%' }}>
               <div className="" style={{ textAlign: 'center', marginBottom: '48px' }}>
                 <h3 className="section-title" style={{ margin: 0 }}>Rent directly in 3 simple steps</h3>
                 <p className="body-md" style={{ color: 'var(--colors-muted)', maxWidth: '500px', margin: '8px auto 0' }}>
@@ -1338,7 +1345,7 @@ export default function App() {
             </section>
 
             {/* FAQ Accordion Section */}
-            <section className="faq-section container animate-reveal" style={{ width: '100%' }}>
+            <section className="faq-section container animate-reveal" id="faq-section" style={{ width: '100%' }}>
               <div className="faq-header">
                 <span className="hero-tagline" style={{ display: 'inline-block', marginBottom: '16px' }}>Got Questions?</span>
                 <h3 className="section-title" style={{ margin: '0 0 16px 0', fontSize: '36px', lineHeight: 1.2, fontWeight: 800 }}>
@@ -1349,30 +1356,64 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="faq-container">
-                {FAQS.map((faq, index) => {
-                  const isActive = expandedFaqIndex === index;
-                  return (
-                    <div 
-                      key={index} 
-                      className={`faq-item ${isActive ? 'active' : ''}`}
-                    >
-                      <button 
-                        className="faq-trigger"
-                        onClick={() => setExpandedFaqIndex(isActive ? null : index)}
-                        aria-expanded={isActive}
+              <div className="faq-grid-layout">
+                {/* Column 1: PGs in Bangalore */}
+                <div className="faq-column">
+                  <h4 className="faq-column-title">PGs in Bangalore</h4>
+                  {FAQS.slice(0, 6).map((faq, index) => {
+                    const actualIndex = index;
+                    const isActive = expandedFaqIndex === actualIndex;
+                    return (
+                      <div 
+                        key={actualIndex} 
+                        className={`faq-item ${isActive ? 'active' : ''}`}
                       >
-                        <span className="faq-question">{faq.q}</span>
-                        <span className="faq-icon">
-                          <ChevronDown size={16} />
-                        </span>
-                      </button>
-                      <div className="faq-content">
-                        <p className="faq-answer">{faq.a}</p>
+                        <button 
+                          className="faq-trigger"
+                          onClick={() => setExpandedFaqIndex(isActive ? null : actualIndex)}
+                          aria-expanded={isActive}
+                        >
+                          <span className="faq-question">{faq.q}</span>
+                          <span className="faq-icon">
+                            <ChevronDown size={16} />
+                          </span>
+                        </button>
+                        <div className="faq-content">
+                          <p className="faq-answer">{faq.a}</p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+
+                {/* Column 2: About PGhive */}
+                <div className="faq-column">
+                  <h4 className="faq-column-title">About PGhive</h4>
+                  {FAQS.slice(6, 12).map((faq, index) => {
+                    const actualIndex = index + 6;
+                    const isActive = expandedFaqIndex === actualIndex;
+                    return (
+                      <div 
+                        key={actualIndex} 
+                        className={`faq-item ${isActive ? 'active' : ''}`}
+                      >
+                        <button 
+                          className="faq-trigger"
+                          onClick={() => setExpandedFaqIndex(isActive ? null : actualIndex)}
+                          aria-expanded={isActive}
+                        >
+                          <span className="faq-question">{faq.q}</span>
+                          <span className="faq-icon">
+                            <ChevronDown size={16} />
+                          </span>
+                        </button>
+                        <div className="faq-content">
+                          <p className="faq-answer">{faq.a}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </section>
           </div>
@@ -1491,6 +1532,24 @@ export default function App() {
               <ul className="footer-links">
                 <li><button onClick={() => setInfoModalType('features')} className="footer-link-btn">New features</button></li>
                 <li><button onClick={() => setInfoModalType('investors')} className="footer-link-btn">Investors</button></li>
+              </ul>
+            </div>
+
+            <div className="">
+              <h4 className="footer-col-title">Popular Localities</h4>
+              <ul className="footer-links">
+                {['Koramangala', 'HSR Layout', 'Indiranagar', 'BTM Layout', 'Marathahalli', 'SG Palya'].map(loc => (
+                  <li key={loc}>
+                    <a 
+                      href={`/pg/${getLocalitySlug(loc)}`}
+                      onClick={(e) => handleFooterLocalityClick(e, loc)}
+                      className="footer-link-btn"
+                      style={{ textDecoration: 'none', background: 'none', border: 'none', padding: 0, textAlign: 'left', cursor: 'pointer', display: 'inline-block' }}
+                    >
+                      PGs in {loc}
+                    </a>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>

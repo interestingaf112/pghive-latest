@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Coins, User, LogOut, Info, Menu, X, LayoutGrid } from 'lucide-react';
+import { Coins, User, LogOut, Info, Menu, X, LayoutGrid, HelpCircle, MapPin, Compass } from 'lucide-react';
 import { signInWithGoogle } from '../firebase';
 import Logo from './Logo';
 import './Header.css';
@@ -43,12 +43,12 @@ export default function Header({
     }
   };
 
-  const scrollToAbout = (e) => {
+  const scrollToSection = (e, id) => {
     e.preventDefault();
     setMobileMenuOpen(false);
-    const aboutEl = document.getElementById('about-section');
-    if (aboutEl) {
-      aboutEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -78,7 +78,19 @@ export default function Header({
             </div>
           ) : (
             <>
-              <a href="#about" onClick={scrollToAbout} className="nav-link">
+              <a href="#how-it-works" onClick={(e) => scrollToSection(e, 'how-it-works')} className="nav-link">
+                <Compass size={14} />
+                <span>How it works</span>
+              </a>
+              <a href="#hubs-section" onClick={(e) => scrollToSection(e, 'hubs-section')} className="nav-link">
+                <MapPin size={14} />
+                <span>Locations</span>
+              </a>
+              <a href="#faq-section" onClick={(e) => scrollToSection(e, 'faq-section')} className="nav-link">
+                <HelpCircle size={14} />
+                <span>FAQ</span>
+              </a>
+              <a href="#about" onClick={(e) => scrollToSection(e, 'about-section')} className="nav-link">
                 <Info size={14} />
                 <span>About Us</span>
               </a>
