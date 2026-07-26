@@ -868,66 +868,6 @@ export default function App() {
                         Explore PGs
                       </button>
                     </div>
-                    
-                    {/* Segmented Global Search Bar */}
-                    <div className="search-bar-pill" style={{ width: '100%', marginTop: '16px' }}>
-                      <div className="search-field-segment">
-                        <span className="caption">Where</span>
-                        <input 
-                          type="text"
-                          list="global-search-localities"
-                          className="search-segment-input"
-                          placeholder="Search localities..."
-                          value={selectedLocality === 'all' ? '' : selectedLocality}
-                          onChange={(e) => handleLocalityChange(e.target.value || 'all')}
-                          style={{ backgroundImage: 'none', paddingRight: 0 }}
-                        />
-                        <datalist id="global-search-localities">
-                          {availableLocalities.filter(l => l !== 'all').map(loc => (
-                            <option key={loc} value={loc} />
-                          ))}
-                        </datalist>
-                      </div>
-
-                      <div className="search-field-segment">
-                        <span className="caption">Who</span>
-                        <select 
-                          className="search-segment-input"
-                          value={selectedGender}
-                          onChange={(e) => setSelectedGender(e.target.value)}
-                        >
-                          <option value="all">Add preference</option>
-                          <option value="boys">Boys Only</option>
-                          <option value="girls">Girls Only</option>
-                          <option value="unisex">Coliving</option>
-                        </select>
-                      </div>
-
-                      <div className="search-field-segment">
-                        <span className="caption">Budget</span>
-                        <select 
-                          className="search-segment-input"
-                          value={selectedPriceRange}
-                          onChange={(e) => setSelectedPriceRange(e.target.value)}
-                        >
-                          <option value="all">Any budget</option>
-                          <option value="under-10000">Under ₹10,000</option>
-                          <option value="10000-15000">₹10k - ₹15k</option>
-                          <option value="above-15000">Above ₹15,000</option>
-                        </select>
-                      </div>
-
-                      <button 
-                        className="search-orb" 
-                        onClick={() => {
-                          const gridEl = document.getElementById('catalog-grid');
-                          gridEl?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        aria-label="Search properties"
-                      >
-                        <Search className="search-orb-icon" size={16} />
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>

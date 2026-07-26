@@ -331,15 +331,15 @@ export default function PGCard({ pg, onViewDetails, isUnlocked }) {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ color: 'var(--colors-muted)', fontSize: '11px', fontWeight: 600 }}>Type:</span>
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pg.furnishing || 'Semi Furnished'}</span>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '12px', color: 'var(--colors-ink)', fontWeight: 600 }}>{pg.furnishing || 'Semi Furnished'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: 'var(--colors-muted)', fontSize: '11px', fontWeight: 600 }}>Date:</span>
-            <span>{pg.availableFrom || 'Immediate'}</span>
+            <span style={{ color: 'var(--colors-muted)', fontSize: '10px', fontWeight: 500 }}>Date:</span>
+            <span style={{ fontSize: '11px', color: 'var(--colors-muted)', fontWeight: 500 }}>{pg.availableFrom || 'Immediate'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <span style={{ color: 'var(--colors-muted)', fontSize: '11px', fontWeight: 600 }}>Sec. Dep:</span>
-            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <span style={{ color: 'var(--colors-muted)', fontSize: '10px', fontWeight: 500 }}>Sec. Dep:</span>
+            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '11px', color: 'var(--colors-muted)', fontWeight: 500 }}>
               {(() => {
                 let val = 0;
                 if (pg.sharingDeposit && Object.keys(pg.sharingDeposit).length > 0) {
@@ -353,7 +353,7 @@ export default function PGCard({ pg, onViewDetails, isUnlocked }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ color: 'var(--colors-muted)', fontSize: '11px', fontWeight: 600 }}>Rent:</span>
-            <span style={{ fontWeight: 700, color: 'var(--colors-primary)' }}>{formatPrice(pg.price)}</span>
+            <span style={{ fontWeight: 800, color: 'var(--colors-primary)', fontSize: '15px' }}>{formatPrice(pg.price)}</span>
           </div>
         </div>
 
