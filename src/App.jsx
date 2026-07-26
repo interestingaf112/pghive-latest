@@ -129,11 +129,6 @@ export default function App() {
     return null;
   });
 
-  // Reset pagination page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedLocality, selectedPriceRange, selectedGender, selectedAmenities, searchInput, aiMatchingIds]);
-
   // Sync Tenant User state to localStorage
   useEffect(() => {
     if (currentUser) {
@@ -219,6 +214,11 @@ export default function App() {
     security: false,
     parking: false
   });
+
+  // Reset pagination page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedLocality, selectedPriceRange, selectedGender, selectedAmenities, searchQuery, aiMatchingIds]);
 
   const hasActiveFilters = 
     searchQuery !== '' || 
