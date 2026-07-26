@@ -77,9 +77,12 @@ const FAQS = [
   }
 ];
 
+const ITEMS_PER_PAGE = 12;
+
 export default function App() {
   const [pgs, setPgs] = useState([]);
   const [expandedFaqIndex, setExpandedFaqIndex] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [is404, setIs404] = useState(false);
   const [selectedCity, setSelectedCity] = useState('bangalore');
@@ -125,6 +128,11 @@ export default function App() {
     }
     return null;
   });
+
+  // Reset pagination page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedLocality, selectedPriceRange, selectedGender, selectedAmenities, searchInput, aiMatchingIds]);
 
   // Sync Tenant User state to localStorage
   useEffect(() => {
@@ -704,6 +712,13 @@ export default function App() {
     return bFeatured - aFeatured;
   });
 
+  // Pagination calculation parameters
+  const totalItems = filteredPGs.length;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  const indexOfLastItem = currentPage * ITEMS_PER_PAGE;
+  const indexOfFirstItem = indexOfLastItem - ITEMS_PER_PAGE;
+  const currentPGs = filteredPGs.slice(indexOfFirstItem, indexOfLastItem);
+
   // Inject/update main directory list schema (ItemList) - Declared after filteredPGs is initialized
   useEffect(() => {
     const existingListSchema = document.getElementById('directory-list-schema');
@@ -1133,16 +1148,90 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="pg-grid" style={{ width: '100%' }}>
-                  {filteredPGs.map((pg, index) => (
-                    <div key={pg.id} className="" style={{ '--reveal-delay': index % 8 }}>
-                      <PGCard 
-                        pg={pg} 
-                        isUnlocked={unlockedPGIds.includes(pg.id)}
-                        onViewDetails={handleSelectPG}
-                      />
+                <div style={{ width: '100%' }}>
+                  <div className="pg-grid" style={{ width: '100%' }}>
+                    {currentPGs.map((pg, index) => (
+                      <div key={pg.id} className="" style={{ '--reveal-delay': index % 8 }}>
+                        <PGCard 
+                          pg={pg} 
+                          isUnlocked={unlockedPGIds.includes(pg.id)}
+                          onViewDetails={handleSelectPG}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="pagination-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '40px', width: '100%', flexWrap: 'wrap' }}>
+                      <button
+                        className="btn btn-secondary animate-hover"
+                        disabled={currentPage === 1}
+                        onClick={() => {
+                          setCurrentPage(prev => Math.max(prev - 1, 1));
+                          const gridEl = document.getElementById('explore-section') || document.getElementById('catalog-grid');
+                          gridEl?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        style={{ padding: '8px 16px', minHeight: '38px', fontSize: '14px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', opacity: currentPage === 1 ? 0.5 : 1 }}
+                      >
+                        <ChevronLeft size={16} /> Prev
+                      </button>
+                      
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNum => {
+                        const isNearCurrent = Math.abs(pageNum - currentPage) <= 1;
+                        const isFirstOrLast = pageNum === 1 || pageNum === totalPages;
+                        if (!isNearCurrent && !isFirstOrLast && totalPages > 5) {
+                          if (pageNum === 2 || pageNum === totalPages - 1) {
+                            return <span key={pageNum} style={{ color: 'var(--colors-muted)', padding: '0 4px' }}>...</span>;
+                          }
+                          return null;
+                        }
+
+                        const isCurrent = pageNum === currentPage;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => {
+                              setCurrentPage(pageNum);
+                              const gridEl = document.getElementById('explore-section') || document.getElementById('catalog-grid');
+                              gridEl?.scrollIntoView({ behavior: 'smooth' });
+                            }}
+                            className={`btn ${isCurrent ? 'btn-primary' : 'btn-secondary'} animate-hover`}
+                            style={{
+                              width: '38px',
+                              height: '38px',
+                              padding: 0,
+                              minHeight: 'unset',
+                              borderRadius: '8px',
+                              fontWeight: 700,
+                              fontSize: '14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: isCurrent ? 'var(--colors-primary)' : 'var(--colors-surface-card)',
+                              color: isCurrent ? '#ffffff' : 'var(--colors-body)',
+                              border: isCurrent ? 'none' : '1px solid var(--colors-hairline)',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+
+                      <button
+                        className="btn btn-secondary animate-hover"
+                        disabled={currentPage === totalPages}
+                        onClick={() => {
+                          setCurrentPage(prev => Math.min(prev + 1, totalPages));
+                          const gridEl = document.getElementById('explore-section') || document.getElementById('catalog-grid');
+                          gridEl?.scrollIntoView({ behavior: 'smooth' });
+                        }}
+                        style={{ padding: '8px 16px', minHeight: '38px', fontSize: '14px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', opacity: currentPage === totalPages ? 0.5 : 1 }}
+                      >
+                        Next <ChevronRight size={16} />
+                      </button>
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
