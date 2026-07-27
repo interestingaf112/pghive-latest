@@ -162,7 +162,19 @@ export default function Header({
             </div>
           ) : (
             <>
-              <a href="#about" onClick={scrollToAbout} className="mobile-nav-link">
+              <a href="#how-it-works" onClick={(e) => scrollToSection(e, 'how-it-works')} className="mobile-nav-link">
+                <Compass size={16} />
+                <span>How it works</span>
+              </a>
+              <a href="#hubs-section" onClick={(e) => scrollToSection(e, 'hubs-section')} className="mobile-nav-link">
+                <MapPin size={16} />
+                <span>Locations</span>
+              </a>
+              <a href="#faq-section" onClick={(e) => scrollToSection(e, 'faq-section')} className="mobile-nav-link">
+                <HelpCircle size={16} />
+                <span>FAQ</span>
+              </a>
+              <a href="#about" onClick={(e) => scrollToSection(e, 'about-section')} className="mobile-nav-link">
                 <Info size={16} />
                 <span>About Us</span>
               </a>
