@@ -679,9 +679,25 @@ export default function App() {
       return false;
     }
 
-    // 2. Locality Filter (case-insensitive partial match)
-    if (selectedLocality !== 'all' && !pg.locality.toLowerCase().includes(selectedLocality.toLowerCase()) && !selectedLocality.toLowerCase().includes(pg.locality.toLowerCase())) {
-      return false;
+    // 2. Locality Filter (slug-normalized comparison to support typos & variations like SG Palya/SG Palaya)
+    if (selectedLocality !== 'all') {
+      const pgLoc = pg.locality || '';
+      const pgSlug = getLocalitySlug(pgLoc);
+      const filterSlug = getLocalitySlug(selectedLocality);
+      
+      const normalizeSg = (s) => s.replace(/[^a-z0-9]/g, '').replace('palaya', 'palya');
+      const pgNormalized = normalizeSg(pgSlug);
+      const filterNormalized = normalizeSg(filterSlug);
+      
+      const isMatch = pgNormalized === filterNormalized || 
+                      pgSlug.includes(filterSlug) || 
+                      filterSlug.includes(pgSlug) ||
+                      pgNormalized.includes(filterNormalized) ||
+                      filterNormalized.includes(pgNormalized);
+                      
+      if (!isMatch) {
+        return false;
+      }
     }
 
     // 3. Gender Filter
@@ -1220,7 +1236,26 @@ export default function App() {
                   { id: 'BTM Layout', name: 'BTM Layout', tag: 'Co-living Hub', desc: 'PG hotspot with great connectivity & affordable eating joints', image: 'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?auto=format&fit=crop&w=600&q=80' },
                   { id: 'Marathahalli', name: 'Marathahalli', tag: 'IT Capital', desc: 'Close to ORR IT parks, shopping hubs & arterial transit lines', image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80' }
                 ].map((hub, index) => {
-                  const count = pgs.filter(pg => pg.locality.toLowerCase() === hub.id.toLowerCase()).length;
+                  const count = pgs.filter(pg => {
+                    if (!pg || !pg.locality) return false;
+                    
+                    // City filter (only count listings matching the active city)
+                    const pgCity = pg.city || 'bangalore';
+                    if (pgCity !== selectedCity) return false;
+
+                    const pgSlug = getLocalitySlug(pg.locality);
+                    const hubSlug = getLocalitySlug(hub.id);
+                    
+                    const normalizeSg = (s) => s.replace(/[^a-z0-9]/g, '').replace('palaya', 'palya');
+                    const pgNormalized = normalizeSg(pgSlug);
+                    const filterNormalized = normalizeSg(hubSlug);
+                    
+                    return pgNormalized === filterNormalized || 
+                           pgSlug.includes(hubSlug) || 
+                           hubSlug.includes(pgSlug) ||
+                           pgNormalized.includes(filterNormalized) ||
+                           filterNormalized.includes(pgNormalized);
+                  }).length;
                   return (
                     <div 
                       key={hub.id} 
