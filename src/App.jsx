@@ -140,6 +140,13 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAccountCentre, setShowAccountCentre] = useState(false);
 
+  // Auto-close Auth Modal when user session is active
+  useEffect(() => {
+    if (currentUser) {
+      setShowAuthModal(false);
+    }
+  }, [currentUser]);
+
   // Credit system — loaded from service layer (not raw localStorage)
   const [userCredits, setUserCredits] = useState(0);
   const [unlockedPGIds, setUnlockedPGIds] = useState([]);

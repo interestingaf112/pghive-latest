@@ -514,19 +514,21 @@ export async function unlockPGContact(pgId) {
       
       // Check fingerprint history for suspicious new device pattern
       const fingerprints = userData.fingerprints || [];
-      if (fingerprints.length > 0 && !fingerprints.includes(currentFingerprint)) {
-        console.warn(`[SECURITY WARNING] Suspicious unlock attempt from new device fingerprint: ${currentFingerprint}`);
-        await updateDoc(doc(db, 'users', userId), {
-          fingerprints: arrayUnion(currentFingerprint),
-          suspiciousFlags: arrayUnion({ timestamp: Date.now(), reason: 'New device unlock request' })
-        });
-      } else if (!fingerprints.includes(currentFingerprint)) {
-        await updateDoc(doc(db, 'users', userId), {
-          fingerprints: arrayUnion(currentFingerprint)
-        });
-      }
+      const needsFingerprint = !fingerprints.includes(currentFingerprint);
 
       if ((userData.unlockedPGs || []).includes(pgId)) {
+        if (needsFingerprint) {
+          if (fingerprints.length > 0) {
+            await updateDoc(doc(db, 'users', userId), {
+              fingerprints: arrayUnion(currentFingerprint),
+              suspiciousFlags: arrayUnion({ timestamp: Date.now(), reason: 'New device unlock request' })
+            });
+          } else {
+            await updateDoc(doc(db, 'users', userId), {
+              fingerprints: arrayUnion(currentFingerprint)
+            });
+          }
+        }
         // Already unlocked — return contacts without deduction
         const contactDoc = await getDoc(doc(db, 'pgs', pgId, 'private', 'contacts'));
         return contactDoc.exists() ? contactDoc.data() : null;
@@ -554,11 +556,20 @@ export async function unlockPGContact(pgId) {
         paymentRef: 'ref_credit_verification'
       };
 
-      await updateDoc(doc(db, 'users', userId), {
+      const updateData = {
         credits: (userData.credits || 0) - 1,
         unlockedPGs: arrayUnion(pgId),
         usageLog: arrayUnion(usageEntry)
-      });
+      };
+
+      if (needsFingerprint) {
+        updateData.fingerprints = arrayUnion(currentFingerprint);
+        if (fingerprints.length > 0) {
+          updateData.suspiciousFlags = arrayUnion({ timestamp: Date.now(), reason: 'New device unlock request' });
+        }
+      }
+
+      await updateDoc(doc(db, 'users', userId), updateData);
 
       // Write centralized unlock record
       const { setDoc } = await import('firebase/firestore');
