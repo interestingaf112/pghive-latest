@@ -480,16 +480,18 @@ export async function unlockPGContact(pgId) {
 
   if (isFirebaseOperational()) {
     try {
-      const { doc, getDoc, updateDoc, arrayUnion } = await import('firebase/firestore');
-      const userId = auth.currentUser.uid;
-      
-      // Email verification gate (prevent throwaway accounts)
       const currentUser = auth.currentUser;
-      const isTestEmail = currentUser?.email && checkIfTestEmail(currentUser.email);
-      if (currentUser && !currentUser.emailVerified && !isTestEmail) {
+      if (!currentUser) {
+        throw new Error("User not authenticated.");
+      }
+
+      // Email verification gate (prevent throwaway accounts)
+      const isTestEmail = currentUser.email && checkIfTestEmail(currentUser.email);
+      if (!currentUser.emailVerified && !isTestEmail) {
         throw new Error("Email verification required. Please check your inbox and verify your email to unlock listing contacts.");
       }
 
+      // Bot protection verification
       try {
         if (appCheck) {
           await getToken(appCheck, false);
@@ -501,143 +503,29 @@ export async function unlockPGContact(pgId) {
           throw new Error("Bot protection verification failed. Request blocked.", { cause: appCheckErr });
         }
       }
-      
-      // Check if already unlocked
-      let userDoc = await getDoc(doc(db, 'users', userId));
-      if (!userDoc.exists()) {
-        const { setDoc } = await import('firebase/firestore');
-        const initialCredits = isTestEmail ? 10 : DEFAULT_CREDITS;
-        await setDoc(doc(db, 'users', userId), { credits: initialCredits, unlockedPGs: [] });
-        
-        // Wait 300ms for Firestore rules engine cache to sync document creation
-        await new Promise(res => setTimeout(res, 300));
-        
-        userDoc = await getDoc(doc(db, 'users', userId));
-      }
-      const userData = userDoc.data();
-      
-      const fetchPrivateContactsWithRetry = async (id) => {
-        let retries = 4;
-        let delay = 150;
-        while (retries > 0) {
-          try {
-            const docSnap = await getDoc(doc(db, 'pgs', id, 'private', 'contacts'));
-            return docSnap;
-          } catch (err) {
-            const isPermissionError = err.code === 'permission-denied' || 
-                                      err.message?.toLowerCase().includes('permission') ||
-                                      err.message?.toLowerCase().includes('insufficient');
-            if (isPermissionError && retries > 1) {
-              console.warn(`Firestore read permission-denied for pg ${id}, retrying in ${delay}ms... (${retries - 1} retries left)`);
-              await new Promise(res => setTimeout(res, delay));
-              delay *= 2;
-              retries--;
-            } else {
-              throw err;
-            }
-          }
-        }
-      };
 
-      // Check fingerprint history for suspicious new device pattern
-      const fingerprints = userData.fingerprints || [];
-      const needsFingerprint = !fingerprints.includes(currentFingerprint);
+      // Get authenticated user ID Token
+      const idToken = await currentUser.getIdToken(true);
 
-      if ((userData.unlockedPGs || []).includes(pgId)) {
-        if (needsFingerprint) {
-          if (fingerprints.length > 0) {
-            await updateDoc(doc(db, 'users', userId), {
-              fingerprints: arrayUnion(currentFingerprint),
-              suspiciousFlags: arrayUnion({ timestamp: Date.now(), reason: 'New device unlock request' })
-            });
-          } else {
-            await updateDoc(doc(db, 'users', userId), {
-              fingerprints: arrayUnion(currentFingerprint)
-            });
-          }
-        }
-        // Already unlocked — return contacts without deduction (with rules propagation retry wrapper)
-        const contactDoc = await fetchPrivateContactsWithRetry(pgId);
-        return contactDoc.exists() ? contactDoc.data() : null;
-      }
-      
-      // Check credit balance
-      if ((userData.credits || 0) <= 0) {
-        return null; // No credits
-      }
-      
-      // Deduct credit and mark as unlocked with usage log
-      const pgDoc = await getDoc(doc(db, 'pgs', pgId));
-      const pgName = pgDoc.exists() ? pgDoc.data().name : 'Unknown PG';
-
-      const usageId = 'use_' + Math.random().toString(36).slice(2, 11);
-      const usageEntry = {
-        id: usageId,
-        pgId,
-        pgName,
-        creditsSpent: 1,
-        timestamp: Date.now(),
-        description: 'Unlocked PG contact details',
-        deviceFingerprint: currentFingerprint,
-        ipHash: 'hash-' + currentFingerprint.substring(0, 10),
-        paymentRef: 'ref_credit_verification'
-      };
-
-      const updateData = {
-        credits: (userData.credits || 0) - 1,
-        unlockedPGs: arrayUnion(pgId),
-        usageLog: arrayUnion(usageEntry)
-      };
-
-      if (needsFingerprint) {
-        updateData.fingerprints = arrayUnion(currentFingerprint);
-        if (fingerprints.length > 0) {
-          updateData.suspiciousFlags = arrayUnion({ timestamp: Date.now(), reason: 'New device unlock request' });
-        }
-      }
-
-      let updateRetries = 4;
-      let updateDelay = 200;
-      while (updateRetries > 0) {
-        try {
-          await updateDoc(doc(db, 'users', userId), updateData);
-          break;
-        } catch (updateErr) {
-          const isPermissionError = updateErr.code === 'permission-denied' || 
-                                    updateErr.message?.toLowerCase().includes('permission') ||
-                                    updateErr.message?.toLowerCase().includes('insufficient');
-          if (isPermissionError && updateRetries > 1) {
-            console.warn(`User document update permission-denied, retrying in ${updateDelay}ms... (${updateRetries - 1} retries left)`);
-            await new Promise(res => setTimeout(res, updateDelay));
-            updateDelay *= 2;
-            updateRetries--;
-          } else {
-            throw updateErr;
-          }
-        }
-      }
-
-      // Write centralized unlock record
-      const { setDoc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'unlocks', usageId), {
-        unlockId: usageId,
-        userId: userId,
-        userEmail: currentUser.email || 'anonymous@pghive.co.in',
-        pgId,
-        pgName,
-        creditsSpent: 1,
-        timestamp: Date.now()
+      // Call serverless API endpoint
+      const response = await fetch('/api/unlock-contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          idToken,
+          pgId,
+          deviceFingerprint: currentFingerprint
+        })
       });
-      
-      // Return private contacts (with rules propagation retry wrapper)
-      const contactDoc = await fetchPrivateContactsWithRetry(pgId);
-      if (contactDoc.exists()) {
-        return contactDoc.data();
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to unlock contacts.');
       }
-      if (pgId.startsWith('mock-') && MOCK_PRIVATE_CONTACTS[pgId]) {
-        return MOCK_PRIVATE_CONTACTS[pgId];
-      }
-      return { phone: '+91 99999 99999', email: 'owner@pghive.com', whatsapp: '+91 99999 99999' };
+
+      return data.contacts;
     } catch (error) {
       console.error("Error unlocking PG contact:", error);
       throw error;

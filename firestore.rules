@@ -97,19 +97,16 @@ service cloud.firestore {
                        )
                        ||
                        // Update rule: enforce credit deduction matches growth of unlocked PG list.
-                       // Credit increments are ONLY possible via Admin SDK (server-side Cloud Functions).
+                       // Normal users can no longer directly update their credits or unlockedPGs themselves.
+                       // Test users are allowed to reset their credits.
                        (resource != null 
-                        && (
-                          // Allow test users to freely reset their credits up to 10
-                          (isTestUser() && request.resource.data.credits <= 10 && request.resource.data.credits >= resource.data.get('credits', 0) && request.resource.data.unlockedPGs.size() == resource.data.get('unlockedPGs', []).size())
-                          ||
-                          // Normal credit deduction rule for unlocks
-                          (request.resource.data.unlockedPGs.size() >= resource.data.get('unlockedPGs', []).size()
-                           && request.resource.data.credits == resource.data.get('credits', 0) - (request.resource.data.unlockedPGs.size() - resource.data.get('unlockedPGs', []).size()))
-                        )
+                        && isTestUser()
+                        && request.resource.data.credits <= 10
+                        && request.resource.data.credits >= resource.data.get('credits', 0)
+                        && request.resource.data.unlockedPGs.size() == resource.data.get('unlockedPGs', []).size()
                        )
-                     ))
-                   );
+                      ))
+                    );
     }
     
     // Collection group query permission for private contact subcollection
@@ -129,9 +126,9 @@ service cloud.firestore {
       );
     }
     
-    // Centralized Unlock Logs
+    // Centralized Unlock Logs (Admin-only write, owner/admin read)
     match /unlocks/{unlockId} {
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow create: if isAdmin();
       allow read: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin());
     }
 
