@@ -163,10 +163,18 @@ export default function PGDetailsModal({
           
           <div style={{ borderLeft: '1px solid var(--colors-hairline)', paddingLeft: '32px' }}>
             {isUnlocked ? (
-              <a href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, borderRadius: '8px' }}>
-                <MessageSquare size={18} />
-                <span>WhatsApp Owner</span>
-              </a>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <a href={getWhatsAppLink()} target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ backgroundColor: '#16a34a', borderColor: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, borderRadius: '8px' }}>
+                  <MessageSquare size={18} />
+                  <span>WhatsApp Owner</span>
+                </a>
+                {contacts.googleMapsUrl && (
+                  <a href={contacts.googleMapsUrl} target="_blank" rel="noopener noreferrer" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, borderRadius: '8px', border: '1.5px solid var(--colors-ink)' }}>
+                    <MapPin size={18} style={{ color: 'var(--colors-primary)' }} />
+                    <span>Show in Maps</span>
+                  </a>
+                )}
+              </div>
             ) : (
               <button onClick={() => onUnlockPG(pg.id)} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontWeight: 700, borderRadius: '8px' }}>
                 <Key size={18} />
@@ -418,6 +426,19 @@ export default function PGDetailsModal({
                         </div>
                       </div>
                     )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <MapPin size={14} style={{ color: 'var(--colors-primary)' }} />
+                      <div>
+                        <span style={{ color: 'var(--colors-muted)' }}>Location: </span>
+                        {contacts.googleMapsUrl ? (
+                          <a href={contacts.googleMapsUrl} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 700, color: 'var(--colors-primary)' }}>
+                            Show in Google Maps
+                          </a>
+                        ) : (
+                          <span style={{ color: 'var(--colors-muted)', fontWeight: 600 }}>Not Provided</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -429,6 +450,11 @@ export default function PGDetailsModal({
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.75)' }}>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--colors-primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Locked details</span>
                       </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--colors-muted)', opacity: 0.7, marginTop: '2px' }}>
+                      <MapPin size={14} />
+                      <span style={{ filter: 'blur(3.5px)', userSelect: 'none' }}>https://maps.google.com/xxxxxx</span>
                     </div>
                     
                     <button 
@@ -472,6 +498,19 @@ export default function PGDetailsModal({
                   <Phone size={16} />
                   Call Property Owner
                 </a>
+
+                {contacts.googleMapsUrl && (
+                  <a 
+                    href={contacts.googleMapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary"
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', minHeight: '40px', border: '1.5px solid var(--colors-ink)', fontWeight: 700 }}
+                  >
+                    <MapPin size={16} style={{ color: 'var(--colors-primary)' }} />
+                    <span>Show in Google Maps</span>
+                  </a>
+                )}
 
                 <button
                   onClick={toggleWishlist}
