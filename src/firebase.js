@@ -512,6 +512,29 @@ export async function unlockPGContact(pgId) {
       }
       const userData = userDoc.data();
       
+      const fetchPrivateContactsWithRetry = async (id) => {
+        let retries = 4;
+        let delay = 150;
+        while (retries > 0) {
+          try {
+            const docSnap = await getDoc(doc(db, 'pgs', id, 'private', 'contacts'));
+            return docSnap;
+          } catch (err) {
+            const isPermissionError = err.code === 'permission-denied' || 
+                                      err.message?.toLowerCase().includes('permission') ||
+                                      err.message?.toLowerCase().includes('insufficient');
+            if (isPermissionError && retries > 1) {
+              console.warn(`Firestore read permission-denied for pg ${id}, retrying in ${delay}ms... (${retries - 1} retries left)`);
+              await new Promise(res => setTimeout(res, delay));
+              delay *= 2;
+              retries--;
+            } else {
+              throw err;
+            }
+          }
+        }
+      };
+
       // Check fingerprint history for suspicious new device pattern
       const fingerprints = userData.fingerprints || [];
       const needsFingerprint = !fingerprints.includes(currentFingerprint);
@@ -529,8 +552,8 @@ export async function unlockPGContact(pgId) {
             });
           }
         }
-        // Already unlocked — return contacts without deduction
-        const contactDoc = await getDoc(doc(db, 'pgs', pgId, 'private', 'contacts'));
+        // Already unlocked — return contacts without deduction (with rules propagation retry wrapper)
+        const contactDoc = await fetchPrivateContactsWithRetry(pgId);
         return contactDoc.exists() ? contactDoc.data() : null;
       }
       
@@ -583,8 +606,8 @@ export async function unlockPGContact(pgId) {
         timestamp: Date.now()
       });
       
-      // Return private contacts
-      const contactDoc = await getDoc(doc(db, 'pgs', pgId, 'private', 'contacts'));
+      // Return private contacts (with rules propagation retry wrapper)
+      const contactDoc = await fetchPrivateContactsWithRetry(pgId);
       if (contactDoc.exists()) {
         return contactDoc.data();
       }
