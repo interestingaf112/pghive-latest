@@ -7,7 +7,6 @@ import {
 import { authenticateAdmin, sendPasswordReset } from '../firebase';
 import { sanitizeText, validatePhone, validateEmail, validatePrice } from '../utils/sanitize';
 import { CITIES, LOCALITY_COORDINATES } from '../utils/constants';
-import LocationPicker from './LocationPicker';
 
 export default function AdminDashboard({ 
   adminUser, 
@@ -1096,25 +1095,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              <LocationPicker
-                onSelect={(coords) => {
-                  setPgLat(coords.lat);
-                  setPgLng(coords.lng);
-                }}
-                defaultCenter={(() => {
-                  const cleaned = pgLocality?.trim().toLowerCase();
-                  if (cleaned) {
-                    const match = Object.keys(LOCALITY_COORDINATES).find(
-                      key => key.toLowerCase() === cleaned
-                    );
-                    if (match) {
-                      return [LOCALITY_COORDINATES[match].lat, LOCALITY_COORDINATES[match].lng];
-                    }
-                  }
-                  return [12.9716, 77.5946];
-                })()}
-                value={pgLat && pgLng ? { lat: pgLat, lng: pgLng } : null}
-              />
 
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label" htmlFor="add-pg-description">Room Description & Guidelines *</label>

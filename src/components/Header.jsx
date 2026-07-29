@@ -14,7 +14,8 @@ export default function Header({
   currentUser,
   onOpenAuthModal,
   onOpenAccountCentre,
-  onAuthSuccess
+  onAuthSuccess,
+  onLogoClick
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -22,6 +23,9 @@ export default function Header({
   const handleLogoClick = () => {
     if (isAdminMode) {
       setIsAdminMode(false);
+    }
+    if (onLogoClick) {
+      onLogoClick();
     }
   };
 

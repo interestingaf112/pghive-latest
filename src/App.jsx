@@ -163,9 +163,9 @@ export default function App() {
 
   const toggleTheme = () => {};
 
-  // Lock body scroll when any modal is visible
+  // Lock body scroll when any modal is visible (excluding selectedPG since it is now a full page)
   useEffect(() => {
-    const isLocked = !!selectedPG || showPurchaseModal || showHelpCenter || showTerms || showPrivacy || showRefund || !!infoModalType || showListModal;
+    const isLocked = showPurchaseModal || showHelpCenter || showTerms || showPrivacy || showRefund || !!infoModalType || showListModal;
     if (isLocked) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -174,7 +174,14 @@ export default function App() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [selectedPG, showPurchaseModal, showHelpCenter, showTerms, showPrivacy, showRefund, infoModalType, showListModal]);
+  }, [showPurchaseModal, showHelpCenter, showTerms, showPrivacy, showRefund, infoModalType, showListModal]);
+
+  // Scroll to top of page when active listing changes (page navigation)
+  useEffect(() => {
+    if (selectedPG) {
+      window.scrollTo(0, 0);
+    }
+  }, [selectedPG]);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -836,6 +843,11 @@ export default function App() {
         onLogout={handleLogoutUser}
         onOpenAccountCentre={() => setShowAccountCentre(true)}
         onAuthSuccess={handleAuthSuccess}
+        onLogoClick={() => {
+          handleSelectPG(null);
+          handleLocalityChange('all');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       <main style={{ flexGrow: 1, position: 'relative', zIndex: 1 }} className="app-main-content">
@@ -860,6 +872,18 @@ export default function App() {
               Go Back Home
             </button>
           </div>
+        ) : selectedPG ? (
+          // ==========================================
+          // PG DETAILS PAGE VIEW
+          // ==========================================
+          <PGDetailsModal 
+            pg={selectedPG} 
+            onClose={() => handleSelectPG(null)}
+            unlockedPGIds={unlockedPGIds}
+            unlockedContacts={unlockedContacts}
+            onUnlockPG={handleUnlockPG}
+            userCredits={userCredits}
+          />
         ) : (
           // ==========================================
           // MAIN MARKETPLACE CATALOG VIEW
@@ -1462,17 +1486,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Details Modal */}
-      {selectedPG && (
-        <PGDetailsModal 
-          pg={selectedPG} 
-          onClose={() => handleSelectPG(null)}
-          unlockedPGIds={unlockedPGIds}
-          unlockedContacts={unlockedContacts}
-          onUnlockPG={handleUnlockPG}
-          userCredits={userCredits}
-        />
-      )}
+
 
 
       {/* Auth Modal overlay */}
