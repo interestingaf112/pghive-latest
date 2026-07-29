@@ -51,6 +51,7 @@ export default async function handler(req, res) {
     let userId = null;
     let userEmail = null;
     let isAdminInitialized = false;
+    let adminInitError = null;
     const serviceAccountRaw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
 
     if (serviceAccountRaw) {
@@ -59,11 +60,23 @@ export default async function handler(req, res) {
         const { getAuth } = await import('firebase-admin/auth');
 
         if (getApps().length === 0) {
-          let serviceAccount = JSON.parse(serviceAccountRaw);
+          let serviceAccount;
+          try {
+            let cleaned = serviceAccountRaw.trim();
+            if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
+              cleaned = cleaned.substring(1, cleaned.length - 1);
+            }
+            serviceAccount = JSON.parse(cleaned);
+          } catch (parseErr) {
+            serviceAccount = JSON.parse(serviceAccountRaw.replace(/\\n/g, '\n'));
+          }
+
           if (serviceAccount.private_key) {
             serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
           }
           initializeApp({ credential: cert(serviceAccount) });
+        } else {
+          isAdminInitialized = true;
         }
 
         const decodedToken = await getAuth().verifyIdToken(idToken);
@@ -72,7 +85,10 @@ export default async function handler(req, res) {
         isAdminInitialized = true;
       } catch (adminErr) {
         console.warn('Firebase Admin verification failed:', adminErr.message);
+        adminInitError = adminErr.message;
       }
+    } else {
+      adminInitError = 'FIREBASE_SERVICE_ACCOUNT_KEY environment variable is missing or empty in Vercel environment.';
     }
 
     if (!userId) {
@@ -102,8 +118,8 @@ export default async function handler(req, res) {
           contacts: contactsData
         });
       }
-      console.error('Firebase Admin SDK could not be initialized.');
-      return res.status(500).json({ error: 'Server configuration error: Firebase Admin SDK is not initialized.' });
+      console.error('Firebase Admin SDK could not be initialized:', adminInitError);
+      return res.status(500).json({ error: `Server configuration error: Firebase Admin SDK is not initialized. Details: ${adminInitError}` });
     }
 
     const { getFirestore } = await import('firebase-admin/firestore');
