@@ -94,6 +94,14 @@ export default async function handler(req, res) {
     }
 
     if (!isAdminInitialized) {
+      if (pgId.startsWith('mock-')) {
+        console.warn('Firebase Admin SDK is not initialized, but returning mock contacts for', pgId);
+        const contactsData = MOCK_PRIVATE_CONTACTS[pgId] || { phone: '+91 99999 99999', email: 'owner@pghive.com', whatsapp: '+91 99999 99999' };
+        return res.status(200).json({
+          success: true,
+          contacts: contactsData
+        });
+      }
       console.error('Firebase Admin SDK could not be initialized.');
       return res.status(500).json({ error: 'Server configuration error: Firebase Admin SDK is not initialized.' });
     }
