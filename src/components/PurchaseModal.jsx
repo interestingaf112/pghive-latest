@@ -104,6 +104,17 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser,
     setSuccessPack(null);
     setErrorMessage(null);
 
+    // CRITICAL SECURITY GATE: Block any payment attempt if user is not authenticated!
+    if (!currentUser) {
+      setIsProcessing(false);
+      setErrorMessage('Sign in required. Please sign in or create an account before purchasing credits.');
+      if (onOpenAuth) {
+        onClose();
+        onOpenAuth();
+      }
+      return;
+    }
+
     const isSdkLoaded = await loadRazorpayScript();
     if (!isSdkLoaded) {
       // SECURITY FIX #3: Removed mock payment simulator.
@@ -123,6 +134,10 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser,
         if (!idToken) {
           setIsProcessing(false);
           setErrorMessage('Please sign in to purchase credits.');
+          if (onOpenAuth) {
+            onClose();
+            onOpenAuth();
+          }
           return;
         }
 
@@ -360,6 +375,31 @@ export default function PurchaseModal({ onClose, onPurchaseSuccess, currentUser,
               <p className="body-sm" style={{ color: 'var(--colors-muted)', marginBottom: '24px' }}>
                 Pay directly to property owners. No Brokerage. Select a contact pack below to get started.
               </p>
+
+              {!currentUser && (
+                <div style={{
+                  padding: '12px 16px',
+                  backgroundColor: 'rgba(234, 179, 8, 0.1)',
+                  border: '1px solid rgba(234, 179, 8, 0.3)',
+                  borderRadius: 'var(--rounded-sm)',
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '12px'
+                }}>
+                  <div style={{ fontSize: '13px', color: 'var(--colors-ink)' }}>
+                    <strong>Sign in required:</strong> Please log in before purchasing so credits can be added to your profile.
+                  </div>
+                  <button 
+                    className="btn btn-primary btn-sm" 
+                    onClick={() => { onClose(); if (onOpenAuth) onOpenAuth(); }}
+                    style={{ whiteSpace: 'nowrap', fontSize: '12px', padding: '6px 14px' }}
+                  >
+                    Sign In Now
+                  </button>
+                </div>
+              )}
 
               {/* Package cards list */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px', width: '100%' }}>

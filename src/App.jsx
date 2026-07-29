@@ -363,6 +363,11 @@ export default function App() {
   };
 
   const handleOpenPurchaseModal = () => {
+    if (!currentUser) {
+      showToast("Please sign in or create an account to purchase credits.", "info");
+      setShowAuthModal(true);
+      return;
+    }
     setShowPurchaseModal(true);
   };
 
@@ -400,6 +405,11 @@ export default function App() {
         "You have 0 credits remaining! Would you like to buy a contact views package?"
       );
       if (buyCredits) {
+        if (!currentUser) {
+          showToast("Please sign in or create an account to purchase credits.", "info");
+          setShowAuthModal(true);
+          return;
+        }
         setShowPurchaseModal(true);
       }
     }
