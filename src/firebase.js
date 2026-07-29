@@ -508,6 +508,10 @@ export async function unlockPGContact(pgId) {
         const { setDoc } = await import('firebase/firestore');
         const initialCredits = isTestEmail ? 10 : DEFAULT_CREDITS;
         await setDoc(doc(db, 'users', userId), { credits: initialCredits, unlockedPGs: [] });
+        
+        // Wait 300ms for Firestore rules engine cache to sync document creation
+        await new Promise(res => setTimeout(res, 300));
+        
         userDoc = await getDoc(doc(db, 'users', userId));
       }
       const userData = userDoc.data();
@@ -592,7 +596,26 @@ export async function unlockPGContact(pgId) {
         }
       }
 
-      await updateDoc(doc(db, 'users', userId), updateData);
+      let updateRetries = 4;
+      let updateDelay = 200;
+      while (updateRetries > 0) {
+        try {
+          await updateDoc(doc(db, 'users', userId), updateData);
+          break;
+        } catch (updateErr) {
+          const isPermissionError = updateErr.code === 'permission-denied' || 
+                                    updateErr.message?.toLowerCase().includes('permission') ||
+                                    updateErr.message?.toLowerCase().includes('insufficient');
+          if (isPermissionError && updateRetries > 1) {
+            console.warn(`User document update permission-denied, retrying in ${updateDelay}ms... (${updateRetries - 1} retries left)`);
+            await new Promise(res => setTimeout(res, updateDelay));
+            updateDelay *= 2;
+            updateRetries--;
+          } else {
+            throw updateErr;
+          }
+        }
+      }
 
       // Write centralized unlock record
       const { setDoc } = await import('firebase/firestore');
