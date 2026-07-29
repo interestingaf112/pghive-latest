@@ -341,8 +341,6 @@ export default function App() {
     setCurrentUser(user);
     
     // Clear any active admin session to prevent conflicts
-    setAdminUser(null);
-    setIsAdminMode(false);
     localStorage.removeItem('admin_session');
     localStorage.removeItem('admin_session_user');
     localStorage.setItem('pg_hub_is_admin_mode', 'false');
