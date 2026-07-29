@@ -561,8 +561,8 @@ export async function unlockPGContact(pgId) {
       const userData = userDoc.data();
       
       const fetchPrivateContactsWithRetry = async (id) => {
-        let retries = 4;
-        let delay = 150;
+        let retries = 6;
+        let delay = 500;
         while (retries > 0) {
           try {
             const docSnap = await getDoc(doc(db, 'pgs', id, 'private', 'contacts'));
@@ -572,9 +572,9 @@ export async function unlockPGContact(pgId) {
                                       err.message?.toLowerCase().includes('permission') ||
                                       err.message?.toLowerCase().includes('insufficient');
             if (isPermissionError && retries > 1) {
-              console.warn(`Firestore read permission-denied for pg ${id}, retrying in ${delay}ms... (${retries - 1} retries left)`);
+              console.warn(`Firestore rules propagation delay — retrying read for pg ${id} in ${delay}ms... (${retries - 1} retries left)`);
               await new Promise(res => setTimeout(res, delay));
-              delay *= 2;
+              delay = Math.min(delay * 1.5, 3000);
               retries--;
             } else {
               throw err;
@@ -672,6 +672,11 @@ export async function unlockPGContact(pgId) {
         creditsSpent: 1,
         timestamp: Date.now()
       });
+      
+      // CRITICAL: Wait for Firestore security rules cache to propagate the unlockedPGs write.
+      // The isUnlocked() rule does a get() on the user doc; without this delay,
+      // the rules engine often evaluates against a stale pre-write snapshot.
+      await new Promise(res => setTimeout(res, 800));
       
       // Return private contacts (with rules propagation retry wrapper)
       const contactDoc = await fetchPrivateContactsWithRetry(pgId);
